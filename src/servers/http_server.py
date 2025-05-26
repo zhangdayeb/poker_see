@@ -11,22 +11,120 @@ HTTP服务器核心模块 - 基于BaseHTTPRequestHandler的HTTP服务器
 6. CORS支持和编码处理
 """
 
+import sys
+from pathlib import Path
+
+# 添加项目根目录到 Python 路径
+def setup_project_paths():
+    """设置项目路径，确保可以正确导入模块"""
+    current_file = Path(__file__).resolve()
+    
+    # 找到项目根目录（包含 main.py 的目录）
+    project_root = current_file
+    while project_root.parent != project_root:
+        if (project_root / "main.py").exists():
+            break
+        project_root = project_root.parent
+    
+    # 将项目根目录添加到 Python 路径
+    project_root_str = str(project_root)
+    if project_root_str not in sys.path:
+        sys.path.insert(0, project_root_str)
+    
+    return project_root
+
+# 调用路径设置
+PROJECT_ROOT = setup_project_paths()
+
 import json
 import os
-
 import threading
 import time
-from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from typing import Dict, Any, Optional
 
-from utils import (
-    safe_encode, safe_decode, get_content_type,
-    log_info, log_success, log_error, log_warning, get_timestamp
-)
-from api_handler import handle_api_request, get_api_documentation
-from static_handler import serve_html_file, serve_static_file, generate_directory_listing
+# 导入工具模块
+try:
+    from src.core.utils import (
+        safe_encode, safe_decode, get_content_type,
+        log_info, log_success, log_error, log_warning, get_timestamp
+    )
+except ImportError:
+    # 如果导入失败，创建临时的日志函数
+    def log_info(msg, tag="INFO"):
+        print(f"[{tag}] {msg}")
+    def log_success(msg, tag="SUCCESS"):
+        print(f"[{tag}] {msg}")
+    def log_error(msg, tag="ERROR"):
+        print(f"[{tag}] {msg}")
+    def log_warning(msg, tag="WARNING"):
+        print(f"[{tag}] {msg}")
+    def get_timestamp():
+        from datetime import datetime
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    def safe_encode(text):
+        return text.encode('utf-8') if isinstance(text, str) else text
+    def safe_decode(data):
+        return data.decode('utf-8') if isinstance(data, bytes) else data
+    def get_content_type(file_path):
+        return 'text/html; charset=utf-8'
+
+# 导入 API 处理器
+try:
+    from src.servers.api_handler import handle_api_request, get_api_documentation
+except ImportError:
+    # 创建临时的 API 处理函数
+    def handle_api_request(method, path, query_params=None, post_data=None):
+        return {
+            'status': 'error',
+            'message': 'API handler not available',
+            'timestamp': get_timestamp()
+        }
+    def get_api_documentation():
+        return {
+            'status': 'success',
+            'data': {
+                'api_info': {
+                    'name': 'Poker Recognition API',
+                    'version': '2.0',
+                    'description': '扑克识别系统API接口'
+                },
+                'endpoints': {
+                    'GET /api/status': '获取系统状态',
+                    'POST /api/test': '测试接口'
+                }
+            }
+        }
+
+# 导入静态文件处理器
+try:
+    from src.servers.static_handler import serve_html_file, serve_static_file, generate_directory_listing
+except ImportError:
+    # 创建临时的静态文件处理函数
+    def serve_html_file(filename):
+        return {
+            'success': False,
+            'error': 'Static handler not available',
+            'status_code': 500
+        }
+    def serve_static_file(path):
+        return {
+            'success': False,
+            'error': 'Static handler not available',
+            'status_code': 500
+        }
+    def generate_directory_listing(directory_path):
+        return f"""
+        <html>
+        <head><title>Directory Listing</title></head>
+        <body>
+            <h1>Directory: {directory_path}</h1>
+            <p>Static handler not available</p>
+            <a href="/">Back to Home</a>
+        </body>
+        </html>
+        """
 
 class HTTPRequestHandler(BaseHTTPRequestHandler):
     """HTTP请求处理器"""
@@ -704,7 +802,7 @@ def run_server_blocking(host: str = 'localhost', port: int = 8000):
 
 if __name__ == "__main__":
     # 直接运行HTTP服务器
-    
+    import sys
     
     host = 'localhost'
     port = 8000

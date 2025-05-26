@@ -10,10 +10,37 @@ API统一处理模块 - 整合所有业务模块，提供RESTful API接口
 5. 集成所有业务模块
 """
 
+
+import sys
+from pathlib import Path
+
+# 添加项目根目录到 Python 路径
+def setup_project_paths():
+    """设置项目路径，确保可以正确导入模块"""
+    current_file = Path(__file__).resolve()
+    
+    # 找到项目根目录（包含 main.py 的目录）
+    project_root = current_file
+    while project_root.parent != project_root:
+        if (project_root / "main.py").exists():
+            break
+        project_root = project_root.parent
+    
+    # 将项目根目录添加到 Python 路径
+    project_root_str = str(project_root)
+    if project_root_str not in sys.path:
+        sys.path.insert(0, project_root_str)
+    
+    return project_root
+
+# 调用路径设置
+PROJECT_ROOT = setup_project_paths()
+
+
 import json
 from typing import Dict, Any, Optional, Callable
 from urllib.parse import urlparse, parse_qs
-from utils import (
+from src.core.utils import (
     parse_json_string, format_success_response, format_error_response,
     log_info, log_success, log_error, log_warning, get_timestamp
 )

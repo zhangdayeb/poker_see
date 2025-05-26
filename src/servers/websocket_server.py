@@ -10,6 +10,33 @@ WebSocket服务器核心模块 - 基于websockets库的WebSocket服务器
 5. 服务器状态监控
 """
 
+
+import sys
+from pathlib import Path
+
+# 添加项目根目录到 Python 路径
+def setup_project_paths():
+    """设置项目路径，确保可以正确导入模块"""
+    current_file = Path(__file__).resolve()
+    
+    # 找到项目根目录（包含 main.py 的目录）
+    project_root = current_file
+    while project_root.parent != project_root:
+        if (project_root / "main.py").exists():
+            break
+        project_root = project_root.parent
+    
+    # 将项目根目录添加到 Python 路径
+    project_root_str = str(project_root)
+    if project_root_str not in sys.path:
+        sys.path.insert(0, project_root_str)
+    
+    return project_root
+
+# 调用路径设置
+PROJECT_ROOT = setup_project_paths()
+
+
 import asyncio
 import json
 import threading
@@ -25,14 +52,87 @@ except ImportError:
     WEBSOCKETS_AVAILABLE = False
     WebSocketServerProtocol = None
 
-from utils import (
+from src.core.utils import (
     get_timestamp, format_success_response, format_error_response,
     log_info, log_success, log_error, log_warning
 )
-from dealer_websocket import (
-    handle_new_connection, handle_message, handle_connection_closed
-)
-from connection_manager import cleanup_all_connections, get_connection_stats
+# 在 websocket_server.py 文件中，找到类似这样的导入语句：
+# from dealer_websocket import xxx
+
+# 将其修改为使用正确的路径和安全导入：
+
+import sys
+from pathlib import Path
+
+# 添加项目根目录到 Python 路径（如果还没有的话）
+def setup_project_paths():
+    """设置项目路径，确保可以正确导入模块"""
+    current_file = Path(__file__).resolve()
+    
+    # 找到项目根目录（包含 main.py 的目录）
+    project_root = current_file
+    while project_root.parent != project_root:
+        if (project_root / "main.py").exists():
+            break
+        project_root = project_root.parent
+    
+    # 将项目根目录添加到 Python 路径
+    project_root_str = str(project_root)
+    if project_root_str not in sys.path:
+        sys.path.insert(0, project_root_str)
+    
+    return project_root
+
+# 调用路径设置
+PROJECT_ROOT = setup_project_paths()
+
+# 安全导入 dealer_websocket 模块
+try:
+    from src.websocket.dealer_websocket import (
+        handle_new_connection,
+        handle_message,
+        handle_connection_closed,
+        push_recognition_update,
+        get_online_dealers
+    )
+    dealer_websocket_available = True
+    print("[WEBSOCKET] dealer_websocket module imported successfully")
+except ImportError as e:
+    print(f"[WEBSOCKET] Warning: Could not import dealer_websocket module: {e}")
+    dealer_websocket_available = False
+    
+    # 创建临时替代函数
+    def handle_new_connection(websocket, remote_address):
+        return {
+            'status': 'error',
+            'message': 'dealer_websocket module not available'
+        }
+    
+    def handle_message(websocket, connection_id, message_text):
+        return {
+            'status': 'error',
+            'message': 'dealer_websocket module not available'
+        }
+    
+    def handle_connection_closed(connection_id, reason="客户端断开"):
+        return {
+            'status': 'error',
+            'message': 'dealer_websocket module not available'
+        }
+    
+    def push_recognition_update(dealer_id=None):
+        return {
+            'status': 'error',
+            'message': 'dealer_websocket module not available'
+        }
+    
+    def get_online_dealers():
+        return {
+            'status': 'error',
+            'message': 'dealer_websocket module not available',
+            'data': {'dealers': [], 'total_count': 0}
+        }
+from src.websocket.connection_manager import cleanup_all_connections, get_connection_stats
 
 class WebSocketServer:
     """WebSocket服务器"""

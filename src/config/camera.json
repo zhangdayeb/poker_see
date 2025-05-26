@@ -1,0 +1,70 @@
+{
+  "version": "1.0",
+  "created_at": "2025-05-26T20:28:17.694850",
+  "cameras": [
+    {
+      "id": "001",
+      "name": "摄像头1",
+      "url": "http://192.168.1.100:8080/video",
+      "description": "默认摄像头",
+      "mark_positions": {
+        "zhuang_1": {
+          "x": 0,
+          "y": 0,
+          "width": 50,
+          "height": 70,
+          "marked": false,
+          "created_at": "2025-05-26T20:28:17.694850",
+          "updated_at": "2025-05-26T20:28:17.694850"
+        },
+        "zhuang_2": {
+          "x": 0,
+          "y": 0,
+          "width": 50,
+          "height": 70,
+          "marked": false,
+          "created_at": "2025-05-26T20:28:17.694850",
+          "updated_at": "2025-05-26T20:28:17.694850"
+        },
+        "zhuang_3": {
+          "x": 0,
+          "y": 0,
+          "width": 50,
+          "height": 70,
+          "marked": false,
+          "created_at": "2025-05-26T20:28:17.694850",
+          "updated_at": "2025-05-26T20:28:17.694850"
+        },
+        "xian_1": {
+          "x": 0,
+          "y": 0,
+          "width": 50,
+          "height": 70,
+          "marked": false,
+          "created_at": "2025-05-26T20:28:17.694850",
+          "updated_at": "2025-05-26T20:28:17.694850"
+        },
+        "xian_2": {
+          "x": 0,
+          "y": 0,
+          "width": 50,
+          "height": 70,
+          "marked": false,
+          "created_at": "2025-05-26T20:28:17.694850",
+          "updated_at": "2025-05-26T20:28:17.694850"
+        },
+        "xian_3": {
+          "x": 0,
+          "y": 0,
+          "width": 50,
+          "height": 70,
+          "marked": false,
+          "created_at": "2025-05-26T20:28:17.694850",
+          "updated_at": "2025-05-26T20:28:17.694850"
+        }
+      },
+      "created_at": "2025-05-26T20:28:17.694850",
+      "updated_at": "2025-05-26T20:28:17.694850"
+    }
+  ]
+}

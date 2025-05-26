@@ -10,18 +10,67 @@
 5. 业务逻辑处理
 """
 
+
+import sys
+from pathlib import Path
+
+# 添加项目根目录到 Python 路径
+def setup_project_paths():
+    """设置项目路径，确保可以正确导入模块"""
+    current_file = Path(__file__).resolve()
+    
+    # 找到项目根目录（包含 main.py 的目录）
+    project_root = current_file
+    while project_root.parent != project_root:
+        if (project_root / "main.py").exists():
+            break
+        project_root = project_root.parent
+    
+    # 将项目根目录添加到 Python 路径
+    project_root_str = str(project_root)
+    if project_root_str not in sys.path:
+        sys.path.insert(0, project_root_str)
+    
+    return project_root
+
+# 调用路径设置
+PROJECT_ROOT = setup_project_paths()
+
+
 import json
 import uuid
 from typing import Dict, Any, Optional, Callable
-from utils import (
+from src.core.utils import (
     get_timestamp, format_success_response, format_error_response,
     log_info, log_success, log_error, log_warning
 )
-from connection_manager import (
+from src.websocket.connection_manager import (
     add_connection, remove_connection, update_heartbeat, send_to_dealer,
     get_dealer_connection, get_all_connections
 )
-from recognition_manager import format_for_dealer
+try:
+    from src.core.recognition_manager import format_for_dealer
+except ImportError:
+    try:
+        from src.processors.recognition_manager import format_for_dealer
+    except ImportError:
+        # 如果找不到 recognition_manager，创建一个临时函数
+        def format_for_dealer(include_metadata=True):
+            return {
+                'status': 'error',
+                'message': 'Recognition manager not available',
+                'data': {
+                    'zhuang_cards': [],
+                    'xian_cards': [],
+                    'result': {
+                        'winner': 'unknown',
+                        'zhuang_score': 0,
+                        'xian_score': 0
+                    },
+                    'timestamp': '2025-01-26 19:10:00',
+                    'confidence': 0.0
+                }
+            }
 
 class DealerWebSocketHandler:
     """荷官WebSocket通信处理器"""
@@ -272,7 +321,7 @@ class DealerWebSocketHandler:
                 }
             
             # 更新连接信息，添加荷官ID
-            from connection_manager import connection_manager
+            from src.websocket.connection_manager import connection_manager
             with connection_manager.connections_lock:
                 if connection_id in connection_manager.active_connections:
                     connection_info = connection_manager.active_connections[connection_id]
@@ -337,7 +386,7 @@ class DealerWebSocketHandler:
         """处理获取系统状态请求"""
         try:
             # 获取连接统计
-            from connection_manager import get_connection_stats
+            from src.websocket.connection_manager import get_connection_stats
             conn_stats = get_connection_stats()
             
             # 获取所有连接信息

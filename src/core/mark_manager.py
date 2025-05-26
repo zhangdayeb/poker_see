@@ -9,13 +9,40 @@
 4. 标记数据的业务逻辑处理
 """
 
+
+import sys
+from pathlib import Path
+
+# 添加项目根目录到 Python 路径
+def setup_project_paths():
+    """设置项目路径，确保可以正确导入模块"""
+    current_file = Path(__file__).resolve()
+    
+    # 找到项目根目录（包含 main.py 的目录）
+    project_root = current_file
+    while project_root.parent != project_root:
+        if (project_root / "main.py").exists():
+            break
+        project_root = project_root.parent
+    
+    # 将项目根目录添加到 Python 路径
+    project_root_str = str(project_root)
+    if project_root_str not in sys.path:
+        sys.path.insert(0, project_root_str)
+    
+    return project_root
+
+# 调用路径设置
+PROJECT_ROOT = setup_project_paths()
+
+
 from typing import Dict, Any, List
-from utils import (
+from src.core.utils import (
     validate_camera_id, validate_mark_position,
     format_success_response, format_error_response,
     log_info, log_success, log_error, log_warning, get_timestamp
 )
-from config_manager import update_camera_marks, get_camera_by_id
+from src.core.config_manager import update_camera_marks, get_camera_by_id
 
 class MarkManager:
     """标记管理器"""
@@ -331,7 +358,7 @@ class MarkManager:
             标记统计信息
         """
         try:
-            from config_manager import get_all_cameras, get_camera_by_id
+            from src.core.config_manager import get_all_cameras, get_camera_by_id
             
             if camera_id:
                 # 获取单个摄像头的统计信息
@@ -403,7 +430,7 @@ class MarkManager:
             导出结果
         """
         try:
-            from config_manager import get_all_cameras, get_camera_by_id
+            from src.core.config_manager import get_all_cameras, get_camera_by_id
             
             if camera_id:
                 camera_result = get_camera_by_id(camera_id)
