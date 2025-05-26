@@ -73,7 +73,9 @@ except ImportError:
 # 导入 API 处理器
 try:
     from src.servers.api_handler import handle_api_request, get_api_documentation
-except ImportError:
+    log_info("✅ API handler 导入成功", "STATIC")
+except ImportError as e:
+    log_info(f"❌ API handler 导入失败: {e}", "STATIC")
     # 创建临时的 API 处理函数
     def handle_api_request(method, path, query_params=None, post_data=None):
         return {

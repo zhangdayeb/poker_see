@@ -65,7 +65,6 @@ class StaticHandler:
         self.image_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico'}
         
         log_info("静态文件处理器初始化完成", "STATIC")
-        log_info(self.pycontroller_dir, "STATIC")
     
     def serve_html_file(self, filename: str) -> Dict[str, Any]:
         """

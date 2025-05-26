@@ -46,10 +46,10 @@ from src.core.utils import (
 )
 
 # 导入所有业务模块
-import config_manager
-import mark_manager
-import photo_controller
-import recognition_manager
+from core import config_manager
+from core import mark_manager
+from processors import photo_controller
+from core import recognition_manager
 import static_handler
 
 class APIHandler:
