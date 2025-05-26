@@ -1,0 +1,275 @@
+{
+  "system": {
+    "ffmpeg": {
+      "path": "ffmpeg",
+      "timeout": 15,
+      "retry_times": 3,
+      "retry_delay": 2
+    },
+    "output": {
+      "directory": "../image",
+      "format": "png",
+      "quality": "high",
+      "backup_enabled": true,
+      "backup_count": 10
+    },
+    "debug": {
+      "enabled": true,
+      "log_level": "INFO",
+      "save_log": true,
+      "log_file": "../result/camera.log"
+    }
+  },
+  "cameras": [
+    {
+      "id": "001",
+      "name": "主桌摄像头",
+      "ip": "192.168.9.123",
+      "username": "admin",
+      "password": "guest425614",
+      "port": 554,
+      "stream_path": "/Streaming/Channels/101",
+      "filename": "camera_001.png",
+      "enabled": true,
+      "description": "监控主游戏桌面",
+      "mark_positions": {
+        "zhuang_1": {
+          "x": 100.0,
+          "y": 150.0,
+          "width": 60.0,
+          "height": 80.0,
+          "marked": true,
+          "label": "庄1",
+          "description": "庄家位置1",
+          "updated_at": "2025-05-26T14:15:09.041329",
+          "validation_passed": true
+        },
+        "zhuang_2": {
+          "x": 120.0,
+          "y": 160.0,
+          "width": 50.0,
+          "height": 70.0,
+          "marked": true,
+          "label": "庄2",
+          "description": "庄家位置2",
+          "updated_at": "2025-05-26T14:12:03.390775",
+          "validation_passed": true
+        },
+        "zhuang_3": {
+          "x": 1535,
+          "y": 277,
+          "width": 261,
+          "height": 174,
+          "marked": true,
+          "label": "庄3",
+          "description": "庄家位置3"
+        },
+        "xian_1": {
+          "x": 250.0,
+          "y": 300.0,
+          "width": 60.0,
+          "height": 80.0,
+          "marked": true,
+          "label": "闲1",
+          "description": "闲家位置1",
+          "updated_at": "2025-05-26T14:12:05.499538",
+          "validation_passed": true
+        },
+        "xian_2": {
+          "x": 1069,
+          "y": 487,
+          "width": 209,
+          "height": 290,
+          "marked": true,
+          "label": "闲2",
+          "description": "闲家位置2"
+        },
+        "xian_3": {
+          "x": 937,
+          "y": 265,
+          "width": 246,
+          "height": 173,
+          "marked": true,
+          "label": "闲3",
+          "description": "闲家位置3"
+        }
+      }
+    },
+    {
+      "id": "002",
+      "name": "侧桌摄像头",
+      "ip": "192.168.9.124",
+      "username": "admin",
+      "password": "guest425614",
+      "port": 554,
+      "stream_path": "/Streaming/Channels/101",
+      "filename": "camera_002.png",
+      "enabled": true,
+      "description": "监控侧面游戏桌",
+      "mark_positions": {
+        "zhuang_1": {
+          "x": 968,
+          "y": 80,
+          "width": 317,
+          "height": 305,
+          "marked": true,
+          "label": "庄1",
+          "description": "庄家位置1"
+        },
+        "zhuang_2": {
+          "x": 1413,
+          "y": 180,
+          "width": 117,
+          "height": 240,
+          "marked": true,
+          "label": "庄2",
+          "description": "庄家位置2"
+        },
+        "zhuang_3": {
+          "x": 1188,
+          "y": 519,
+          "width": 168,
+          "height": 129,
+          "marked": true,
+          "label": "庄3",
+          "description": "庄家位置3"
+        },
+        "xian_1": {
+          "x": 1627,
+          "y": 182,
+          "width": 127,
+          "height": 295,
+          "marked": true,
+          "label": "闲1",
+          "description": "闲家位置1"
+        },
+        "xian_2": {
+          "x": 544,
+          "y": 119,
+          "width": 290,
+          "height": 206,
+          "marked": true,
+          "label": "闲2",
+          "description": "闲家位置2"
+        },
+        "xian_3": {
+          "x": 692,
+          "y": 450,
+          "width": 256,
+          "height": 191,
+          "marked": true,
+          "label": "闲3",
+          "description": "闲家位置3"
+        }
+      }
+    },
+    {
+      "id": "003",
+      "name": "全景摄像头",
+      "ip": "192.168.9.125",
+      "username": "admin",
+      "password": "guest425614",
+      "port": 554,
+      "stream_path": "/Streaming/Channels/101",
+      "filename": "camera_003.png",
+      "enabled": false,
+      "description": "监控整体环境",
+      "mark_positions": {
+        "zhuang_1": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "marked": false,
+          "label": "庄1",
+          "description": "庄家位置1"
+        },
+        "zhuang_2": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "marked": false,
+          "label": "庄2",
+          "description": "庄家位置2"
+        },
+        "zhuang_3": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "marked": false,
+          "label": "庄3",
+          "description": "庄家位置3"
+        },
+        "xian_1": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "marked": false,
+          "label": "闲1",
+          "description": "闲家位置1"
+        },
+        "xian_2": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "marked": false,
+          "label": "闲2",
+          "description": "闲家位置2"
+        },
+        "xian_3": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "marked": false,
+          "label": "闲3",
+          "description": "闲家位置3"
+        }
+      }
+    }
+  ],
+  "ffmpeg_options": {
+    "input_options": [
+      "-rtsp_transport",
+      "tcp",
+      "-stimeout",
+      "10000000",
+      "-analyzeduration",
+      "2147483647",
+      "-probesize",
+      "2147483647"
+    ],
+    "output_options": [
+      "-vframes",
+      "1",
+      "-q:v",
+      "2",
+      "-y"
+    ]
+  },
+  "capture_settings": {
+    "concurrent_capture": false,
+    "capture_delay": 1,
+    "max_file_size_mb": 50,
+    "min_file_size_kb": 100
+  },
+  "schedule": {
+    "auto_capture": false,
+    "interval_minutes": 5,
+    "start_time": "08:00:00",
+    "end_time": "22:00:00",
+    "days_of_week": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ]
+  }
+}
