@@ -10,7 +10,6 @@ API统一处理模块 - 整合所有业务模块，提供RESTful API接口
 5. 集成所有业务模块
 """
 
-
 import sys
 from pathlib import Path
 
@@ -36,7 +35,6 @@ def setup_project_paths():
 # 调用路径设置
 PROJECT_ROOT = setup_project_paths()
 
-
 import json
 from typing import Dict, Any, Optional, Callable
 from urllib.parse import urlparse, parse_qs
@@ -45,12 +43,107 @@ from src.core.utils import (
     log_info, log_success, log_error, log_warning, get_timestamp
 )
 
-# 导入所有业务模块
-from core import config_manager
-from core import mark_manager
-from processors import photo_controller
-from core import recognition_manager
-import static_handler
+# 安全导入所有业务模块
+try:
+    from src.core import config_manager
+    config_manager_available = True
+except ImportError as e:
+    print(f"Warning: Could not import config_manager: {e}")
+    config_manager_available = False
+
+try:
+    from src.core import mark_manager
+    mark_manager_available = True
+except ImportError as e:
+    print(f"Warning: Could not import mark_manager: {e}")
+    mark_manager_available = False
+
+try:
+    from src.processors import photo_controller
+    photo_controller_available = True
+except ImportError as e:
+    print(f"Warning: Could not import photo_controller: {e}")
+    photo_controller_available = False
+
+try:
+    from src.core import recognition_manager
+    recognition_manager_available = True
+except ImportError as e:
+    print(f"Warning: Could not import recognition_manager: {e}")
+    recognition_manager_available = False
+
+try:
+    from src.servers import static_handler
+    static_handler_available = True
+except ImportError as e:
+    print(f"Warning: Could not import static_handler: {e}")
+    static_handler_available = False
+
+# 创建安全的模块接口
+class SafeModuleInterface:
+    """安全的模块接口，处理模块不可用的情况"""
+    
+    @staticmethod
+    def safe_call(module_available, func_name, *args, **kwargs):
+        """安全调用模块函数"""
+        if not module_available:
+            return format_error_response(
+                f"模块不可用: {func_name}",
+                "MODULE_NOT_AVAILABLE"
+            )
+        
+        try:
+            # 根据函数名调用对应的模块函数
+            if func_name == 'get_all_cameras' and config_manager_available:
+                return config_manager.get_all_cameras()
+            elif func_name == 'get_camera_by_id' and config_manager_available:
+                return config_manager.get_camera_by_id(*args)
+            elif func_name == 'update_camera' and config_manager_available:
+                return config_manager.update_camera(*args, **kwargs)
+            elif func_name == 'add_camera' and config_manager_available:
+                return config_manager.add_camera(*args)
+            elif func_name == 'delete_camera' and config_manager_available:
+                return config_manager.delete_camera(*args)
+            elif func_name == 'get_config_status' and config_manager_available:
+                return config_manager.get_config_status()
+            
+            elif func_name == 'save_camera_marks' and mark_manager_available:
+                return mark_manager.save_camera_marks(*args)
+            elif func_name == 'batch_save_marks' and mark_manager_available:
+                return mark_manager.batch_save_marks(*args)
+            elif func_name == 'validate_marks_data' and mark_manager_available:
+                return mark_manager.validate_marks_data(*args)
+            elif func_name == 'get_mark_statistics' and mark_manager_available:
+                return mark_manager.get_mark_statistics(*args)
+            
+            elif func_name == 'take_photo_by_id' and photo_controller_available:
+                return photo_controller.take_photo_by_id(*args, **kwargs)
+            elif func_name == 'get_photo_status' and photo_controller_available:
+                return photo_controller.get_photo_status(*args)
+            elif func_name == 'list_photos' and photo_controller_available:
+                return photo_controller.list_photos(*args, **kwargs)
+            elif func_name == 'cleanup_old_photos' and photo_controller_available:
+                return photo_controller.cleanup_old_photos(*args, **kwargs)
+            
+            elif func_name == 'get_latest_recognition' and recognition_manager_available:
+                return recognition_manager.get_latest_recognition()
+            elif func_name == 'receive_recognition_data' and recognition_manager_available:
+                return recognition_manager.receive_recognition_data(*args)
+            
+            else:
+                return format_error_response(
+                    f"未知函数或模块不可用: {func_name}",
+                    "UNKNOWN_FUNCTION"
+                )
+                
+        except Exception as e:
+            log_error(f"调用模块函数失败 {func_name}: {e}", "API")
+            return format_error_response(
+                f"函数调用失败: {str(e)}",
+                "FUNCTION_CALL_ERROR"
+            )
+
+safe_interface = SafeModuleInterface()
 
 class APIHandler:
     """API处理器 - 统一的API接口管理"""
@@ -208,7 +301,7 @@ class APIHandler:
     
     def _handle_get_all_cameras(self, **kwargs) -> Dict[str, Any]:
         """获取所有摄像头配置"""
-        return config_manager.get_all_cameras()
+        return safe_interface.safe_call(config_manager_available, 'get_all_cameras')
     
     def _handle_get_camera_by_id(self, path_params: Dict[str, str], **kwargs) -> Dict[str, Any]:
         """获取指定摄像头配置"""
@@ -216,41 +309,41 @@ class APIHandler:
         if not camera_id:
             return format_error_response("摄像头ID不能为空", "MISSING_CAMERA_ID")
         
-        return config_manager.get_camera_by_id(camera_id)
+        return safe_interface.safe_call(config_manager_available, 'get_camera_by_id', camera_id)
     
     def _handle_get_recognition_result(self, **kwargs) -> Dict[str, Any]:
         """获取最新识别结果"""
-        return recognition_manager.get_latest_recognition()
+        return safe_interface.safe_call(recognition_manager_available, 'get_latest_recognition')
     
     def _handle_get_photo_status(self, **kwargs) -> Dict[str, Any]:
         """获取所有摄像头拍照状态"""
-        return photo_controller.get_photo_status()
+        return safe_interface.safe_call(photo_controller_available, 'get_photo_status')
     
     def _handle_get_camera_photo_status(self, path_params: Dict[str, str], **kwargs) -> Dict[str, Any]:
         """获取指定摄像头拍照状态"""
         camera_id = path_params.get('id')
-        return photo_controller.get_photo_status(camera_id)
+        return safe_interface.safe_call(photo_controller_available, 'get_photo_status', camera_id)
     
     def _handle_list_photos(self, query_params: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """列出所有图片"""
         limit = int(query_params.get('limit', [20])[0]) if 'limit' in query_params else 20
-        return photo_controller.list_photos(limit=limit)
+        return safe_interface.safe_call(photo_controller_available, 'list_photos', limit=limit)
     
     def _handle_list_camera_photos(self, path_params: Dict[str, str], 
                                   query_params: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """列出指定摄像头的图片"""
         camera_id = path_params.get('id')
         limit = int(query_params.get('limit', [10])[0]) if 'limit' in query_params else 10
-        return photo_controller.list_photos(camera_id, limit)
+        return safe_interface.safe_call(photo_controller_available, 'list_photos', camera_id, limit=limit)
     
     def _handle_get_mark_statistics(self, query_params: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """获取标记统计信息"""
         camera_id = query_params.get('camera_id', [None])[0] if 'camera_id' in query_params else None
-        return mark_manager.get_mark_statistics(camera_id)
+        return safe_interface.safe_call(mark_manager_available, 'get_mark_statistics', camera_id)
     
     def _handle_get_config_status(self, **kwargs) -> Dict[str, Any]:
         """获取配置状态"""
-        return config_manager.get_config_status()
+        return safe_interface.safe_call(config_manager_available, 'get_config_status')
     
     def _handle_get_system_info(self, **kwargs) -> Dict[str, Any]:
         """获取系统信息"""
@@ -261,6 +354,13 @@ class APIHandler:
                 'version': '2.0',
                 'api_version': '1.0',
                 'timestamp': get_timestamp(),
+                'module_status': {
+                    'config_manager': config_manager_available,
+                    'mark_manager': mark_manager_available,
+                    'photo_controller': photo_controller_available,
+                    'recognition_manager': recognition_manager_available,
+                    'static_handler': static_handler_available
+                },
                 'available_endpoints': {
                     'GET': list(self.routes['GET'].keys()),
                     'POST': list(self.routes['POST'].keys()),
@@ -277,7 +377,7 @@ class APIHandler:
         if not request_data:
             return format_error_response("请求数据不能为空", "EMPTY_REQUEST_DATA")
         
-        return recognition_manager.receive_recognition_data(request_data)
+        return safe_interface.safe_call(recognition_manager_available, 'receive_recognition_data', request_data)
     
     def _handle_take_photo(self, request_data: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """拍照"""
@@ -289,7 +389,7 @@ class APIHandler:
             return format_error_response("摄像头ID不能为空", "MISSING_CAMERA_ID")
         
         options = request_data.get('options', {})
-        return photo_controller.take_photo_by_id(camera_id, options)
+        return safe_interface.safe_call(photo_controller_available, 'take_photo_by_id', camera_id, options=options)
     
     def _handle_save_camera_marks(self, path_params: Dict[str, str], 
                                  request_data: Dict[str, Any], **kwargs) -> Dict[str, Any]:
@@ -301,21 +401,21 @@ class APIHandler:
         if not request_data:
             return format_error_response("标记数据不能为空", "EMPTY_MARKS_DATA")
         
-        return mark_manager.save_camera_marks(camera_id, request_data)
+        return safe_interface.safe_call(mark_manager_available, 'save_camera_marks', camera_id, request_data)
     
     def _handle_batch_save_marks(self, request_data: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """批量保存标记数据"""
         if not request_data:
             return format_error_response("批量数据不能为空", "EMPTY_BATCH_DATA")
         
-        return mark_manager.batch_save_marks(request_data)
+        return safe_interface.safe_call(mark_manager_available, 'batch_save_marks', request_data)
     
     def _handle_add_camera(self, request_data: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """添加摄像头"""
         if not request_data:
             return format_error_response("摄像头数据不能为空", "EMPTY_CAMERA_DATA")
         
-        return config_manager.add_camera(request_data)
+        return safe_interface.safe_call(config_manager_available, 'add_camera', request_data)
     
     def _handle_update_camera(self, path_params: Dict[str, str], 
                              request_data: Dict[str, Any], **kwargs) -> Dict[str, Any]:
@@ -327,7 +427,7 @@ class APIHandler:
         if not request_data:
             return format_error_response("更新数据不能为空", "EMPTY_UPDATE_DATA")
         
-        return config_manager.update_camera(camera_id, request_data)
+        return safe_interface.safe_call(config_manager_available, 'update_camera', camera_id, request_data)
     
     def _handle_delete_camera(self, path_params: Dict[str, str], **kwargs) -> Dict[str, Any]:
         """删除摄像头"""
@@ -335,21 +435,21 @@ class APIHandler:
         if not camera_id:
             return format_error_response("摄像头ID不能为空", "MISSING_CAMERA_ID")
         
-        return config_manager.delete_camera(camera_id)
+        return safe_interface.safe_call(config_manager_available, 'delete_camera', camera_id)
     
     def _handle_validate_marks(self, request_data: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """验证标记数据"""
         if not request_data:
             return format_error_response("标记数据不能为空", "EMPTY_MARKS_DATA")
         
-        return mark_manager.validate_marks_data(request_data)
+        return safe_interface.safe_call(mark_manager_available, 'validate_marks_data', request_data)
     
     def _handle_cleanup_photos(self, request_data: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """清理图片文件"""
         keep_count = request_data.get('keep_count', 50) if request_data else 50
         camera_id = request_data.get('camera_id') if request_data else None
         
-        return photo_controller.cleanup_old_photos(keep_count, camera_id)
+        return safe_interface.safe_call(photo_controller_available, 'cleanup_old_photos', keep_count, camera_id)
     
     def get_api_documentation(self) -> Dict[str, Any]:
         """获取API文档"""
@@ -398,6 +498,7 @@ class APIHandler:
             "API文档获取成功",
             data=docs
         )
+
 
 # 创建全局实例
 api_handler = APIHandler()
