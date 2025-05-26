@@ -51,7 +51,7 @@ class StaticHandler:
     def __init__(self):
         """初始化静态文件处理器"""
         # 设置目录路径
-        self.pycontroller_dir = Path(__file__).parent
+        self.pycontroller_dir = Path(__file__).parent.parent.parent / 'web' / 'templates'
         self.image_dir = get_image_dir()
         
         # 支持的文件类型
@@ -65,6 +65,7 @@ class StaticHandler:
         self.image_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico'}
         
         log_info("静态文件处理器初始化完成", "STATIC")
+        log_info(self.pycontroller_dir, "STATIC")
     
     def serve_html_file(self, filename: str) -> Dict[str, Any]:
         """
