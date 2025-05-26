@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🎯 扑克位置标记工具</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
     <style>
         * {
             margin: 0;
@@ -24,215 +23,84 @@
             margin: 0 auto;
             background: white;
             border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
         }
 
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        /* 顶部工具栏 */
+        .toolbar {
+            background: #34495e;
             color: white;
-            padding: 30px;
-            text-align: center;
-        }
-
-        .header h1 {
-            font-size: 2.2rem;
-            margin-bottom: 10px;
-        }
-
-        .header p {
-            opacity: 0.9;
-            font-size: 1.1rem;
-        }
-
-        .main-content {
-            display: grid;
-            grid-template-columns: 1fr 350px;
-            gap: 0;
-            min-height: 70vh;
-        }
-
-        .image-panel {
-            background: #f8f9fa;
-            padding: 30px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-        }
-
-        .image-container {
-            position: relative;
-            max-width: 100%;
-            max-height: 500px;
-            background: #e9ecef;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 400px;
-            border: 2px dashed #adb5bd;
-        }
-
-        .placeholder-text {
-            color: #6c757d;
-            font-size: 1.2rem;
-            text-align: center;
-        }
-
-        .current-image {
-            max-width: 100%;
-            max-height: 100%;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-
-        .control-panel {
-            background: #2c3e50;
-            color: white;
-            padding: 30px;
-            display: flex;
-            flex-direction: column;
-            gap: 25px;
-        }
-
-        .section {
-            background: rgba(255,255,255,0.1);
-            border-radius: 10px;
             padding: 20px;
-        }
-
-        .section h3 {
-            margin-bottom: 15px;
-            font-size: 1.2rem;
-            color: #ecf0f1;
             display: flex;
             align-items: center;
-            gap: 8px;
-        }
-
-        .camera-selector {
-            display: flex;
-            gap: 10px;
+            gap: 20px;
             flex-wrap: wrap;
         }
 
-        .camera-btn {
-            background: #3498db;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.3s ease;
-            min-width: 50px;
-        }
-
-        .camera-btn:hover {
-            background: #2980b9;
-            transform: translateY(-2px);
-        }
-
-        .camera-btn.active {
-            background: #e74c3c;
-        }
-
-        .status-display {
-            background: rgba(0,0,0,0.2);
-            border-radius: 8px;
-            padding: 15px;
-        }
-
-        .status-item {
+        .toolbar-group {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 8px;
+            gap: 10px;
         }
 
-        .status-item:last-child {
-            margin-bottom: 0;
-        }
-
-        .status-label {
-            color: #bdc3c7;
-        }
-
-        .status-value {
-            color: #ecf0f1;
+        .toolbar-label {
             font-weight: bold;
+            color: #ecf0f1;
+        }
+
+        /* 摄像头选择下拉框 */
+        .camera-select {
+            background: #2c3e50;
+            color: white;
+            border: 1px solid #34495e;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 14px;
+            min-width: 150px;
+        }
+
+        .camera-select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        /* 状态显示 */
+        .status-info {
+            background: rgba(255,255,255,0.1);
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 14px;
         }
 
         .marked-count {
             color: #2ecc71;
+            font-weight: bold;
         }
 
         .unmarked-count {
             color: #e74c3c;
-        }
-
-        .mark-list {
-            background: rgba(0,0,0,0.2);
-            border-radius: 8px;
-            padding: 15px;
-        }
-
-        .mark-item {
-            background: rgba(255,255,255,0.1);
-            border-radius: 6px;
-            padding: 10px;
-            margin-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .mark-item:last-child {
-            margin-bottom: 0;
-        }
-
-        .mark-name {
             font-weight: bold;
         }
 
-        .mark-status {
-            font-size: 0.9rem;
-        }
-
-        .mark-status.marked {
-            color: #2ecc71;
-        }
-
-        .mark-status.unmarked {
-            color: #95a5a6;
-        }
-
-        .action-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .btn {
-            background: #27ae60;
+        /* 操作按钮 */
+        .action-btn {
+            background: #3498db;
             color: white;
             border: none;
-            padding: 12px 20px;
-            border-radius: 6px;
+            padding: 10px 16px;
+            border-radius: 5px;
             cursor: pointer;
-            font-size: 1rem;
+            font-size: 14px;
             transition: all 0.3s ease;
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 8px;
+            gap: 6px;
         }
 
-        .btn:hover {
+        .action-btn:hover {
+            background: #2980b9;
             transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
 
         .btn-photo {
@@ -264,118 +132,193 @@
             pointer-events: none;
         }
 
-        .loading::after {
-            content: '⏳';
-            margin-left: 8px;
+        /* 主要内容区域 */
+        .main-content {
+            height: calc(100vh - 160px);
+            background: #f5f6fa;
+            position: relative;
+            overflow: hidden;
         }
 
+        /* 图片容器 */
+        .image-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: auto;
+            cursor: grab;
+        }
+
+        .image-container.dragging {
+            cursor: grabbing;
+        }
+
+        .image-wrapper {
+            position: relative;
+            display: inline-block;
+            min-width: 100%;
+            min-height: 100%;
+        }
+
+        .current-image {
+            display: block;
+            max-width: none;
+            height: auto;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        /* 占位符 */
+        .placeholder {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 1.2rem;
+        }
+
+        /* 标记点样式 */
+        .mark-point {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: #e74c3c;
+            border: 3px solid #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+
+        .mark-point:hover {
+            background: #c0392b;
+            transform: translate(-50%, -50%) scale(1.2);
+        }
+
+        .mark-point.active {
+            background: #f39c12;
+            border-color: #f1c40f;
+        }
+
+        /* 标记标签 */
+        .mark-label {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .mark-point:hover .mark-label {
+            opacity: 1;
+        }
+
+        /* 标记矩形框 */
+        .mark-rect {
+            position: absolute;
+            border: 2px dashed #e74c3c;
+            background: rgba(231, 76, 60, 0.1);
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        /* 响应式设计 */
         @media (max-width: 1200px) {
-            .main-content {
-                grid-template-columns: 1fr;
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 15px;
             }
             
-            .control-panel {
-                order: -1;
+            .toolbar-group {
+                justify-content: center;
             }
         }
 
         @media (max-width: 768px) {
-            .header h1 {
-                font-size: 1.8rem;
+            body {
+                padding: 10px;
+            }
+            
+            .toolbar {
+                padding: 15px;
             }
             
             .main-content {
-                padding: 15px;
+                height: calc(100vh - 140px);
             }
+        }
+
+        /* 滚动条样式 */
+        .image-container::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .image-container::-webkit-scrollbar-track {
+            background: #ecf0f1;
+        }
+
+        .image-container::-webkit-scrollbar-thumb {
+            background: #bdc3c7;
+            border-radius: 4px;
+        }
+
+        .image-container::-webkit-scrollbar-thumb:hover {
+            background: #95a5a6;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>🎯 扑克位置标记工具</h1>
-            <p>选择摄像头并标记扑克牌位置</p>
-        </div>
+        <!-- 顶部工具栏 -->
+        <div class="toolbar">
+            <div class="toolbar-group">
+                <span class="toolbar-label">📷 摄像头:</span>
+                <select class="camera-select" id="cameraSelect">
+                    <option value="">正在加载...</option>
+                </select>
+            </div>
 
-        <div class="main-content">
-            <div class="image-panel">
-                <div class="image-container" id="imageContainer">
-                    <div class="placeholder-text">
-                        请选择摄像头开始标记<br>
-                        <small>选择摄像头后点击拍照按钮获取图片</small>
-                    </div>
+            <div class="toolbar-group">
+                <span class="toolbar-label">📊 状态:</span>
+                <div class="status-info">
+                    已标记: <span class="marked-count" id="markedCount">0</span> / 
+                    未标记: <span class="unmarked-count" id="unmarkedCount">6</span>
                 </div>
             </div>
 
-            <div class="control-panel">
-                <!-- 摄像头选择 -->
-                <div class="section">
-                    <h3>📷 摄像头信息</h3>
-                    <div class="camera-selector" id="cameraSelector">
-                        <div class="placeholder-text">正在加载摄像头...</div>
-                    </div>
-                </div>
+            <div class="toolbar-group">
+                <button class="action-btn btn-photo" id="takePhotoBtn">
+                    📸 拍照
+                </button>
+                <button class="action-btn btn-save" id="saveMarksBtn">
+                    💾 保存标记
+                </button>
+                <button class="action-btn btn-reset" id="resetMarksBtn">
+                    🔄 重置标记
+                </button>
+            </div>
+        </div>
 
-                <!-- 标记状态 -->
-                <div class="section">
-                    <h3>📊 标记状态</h3>
-                    <div class="status-display">
-                        <div class="status-item">
-                            <span class="status-label">已标记:</span>
-                            <span class="status-value marked-count" id="markedCount">0</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="status-label">未标记:</span>
-                            <span class="status-value unmarked-count" id="unmarkedCount">6</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 标记列表 -->
-                <div class="section">
-                    <h3>📝 标记列表</h3>
-                    <div class="mark-list" id="markList">
-                        <div class="mark-item">
-                            <span class="mark-name">庄1</span>
-                            <span class="mark-status unmarked">暂无标记</span>
-                        </div>
-                        <div class="mark-item">
-                            <span class="mark-name">庄2</span>
-                            <span class="mark-status unmarked">暂无标记</span>
-                        </div>
-                        <div class="mark-item">
-                            <span class="mark-name">庄3</span>
-                            <span class="mark-status unmarked">暂无标记</span>
-                        </div>
-                        <div class="mark-item">
-                            <span class="mark-name">闲1</span>
-                            <span class="mark-status unmarked">暂无标记</span>
-                        </div>
-                        <div class="mark-item">
-                            <span class="mark-name">闲2</span>
-                            <span class="mark-status unmarked">暂无标记</span>
-                        </div>
-                        <div class="mark-item">
-                            <span class="mark-name">闲3</span>
-                            <span class="mark-status unmarked">暂无标记</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 操作按钮 -->
-                <div class="section">
-                    <h3>🎮 操作</h3>
-                    <div class="action-buttons">
-                        <button class="btn btn-photo" id="takePhotoBtn">
-                            📸 拍照
-                        </button>
-                        <button class="btn btn-save" id="saveMarksBtn">
-                            💾 保存标记
-                        </button>
-                        <button class="btn btn-reset" id="resetMarksBtn">
-                            🔄 重置标记
-                        </button>
-                    </div>
+        <!-- 主要内容区域 -->
+        <div class="main-content">
+            <div class="image-container" id="imageContainer">
+                <div class="placeholder" id="placeholder">
+                    选择摄像头查看图片<br>
+                    <small>如果没有图片，请先拍照</small>
                 </div>
             </div>
         </div>
@@ -387,7 +330,10 @@
             currentCamera: null,
             cameras: [],
             marks: {},
-            imageLoaded: false
+            imageLoaded: false,
+            isDragging: false,
+            dragStart: { x: 0, y: 0 },
+            scrollStart: { x: 0, y: 0 }
         };
 
         // 位置映射
@@ -402,11 +348,11 @@
 
         // DOM元素
         const elements = {
-            cameraSelector: document.getElementById('cameraSelector'),
+            cameraSelect: document.getElementById('cameraSelect'),
             imageContainer: document.getElementById('imageContainer'),
+            placeholder: document.getElementById('placeholder'),
             markedCount: document.getElementById('markedCount'),
             unmarkedCount: document.getElementById('unmarkedCount'),
-            markList: document.getElementById('markList'),
             takePhotoBtn: document.getElementById('takePhotoBtn'),
             saveMarksBtn: document.getElementById('saveMarksBtn'),
             resetMarksBtn: document.getElementById('resetMarksBtn')
@@ -434,54 +380,105 @@
                 
                 if (result.status === 'success') {
                     appState.cameras = result.data.cameras;
-                    renderCameraSelector();
+                    renderCameraSelect();
+                    
+                    // 如果有摄像头，默认选择第一个
+                    if (appState.cameras.length > 0) {
+                        const firstCamera = appState.cameras[0];
+                        elements.cameraSelect.value = firstCamera.id;
+                        await selectCamera(firstCamera.id);
+                    }
+                    
                     console.log('摄像头加载成功:', appState.cameras.length, '个');
                 } else {
                     throw new Error(result.message || '获取摄像头列表失败');
                 }
             } catch (error) {
                 console.error('加载摄像头失败:', error);
-                elements.cameraSelector.innerHTML = '<div class="placeholder-text">加载摄像头失败</div>';
+                elements.cameraSelect.innerHTML = '<option value="">加载失败</option>';
             }
         }
 
         // 渲染摄像头选择器
-        function renderCameraSelector() {
+        function renderCameraSelect() {
             if (appState.cameras.length === 0) {
-                elements.cameraSelector.innerHTML = '<div class="placeholder-text">没有找到摄像头</div>';
+                elements.cameraSelect.innerHTML = '<option value="">没有找到摄像头</option>';
                 return;
             }
 
-            const buttonsHtml = appState.cameras.map(camera => 
-                `<button class="camera-btn" data-camera-id="${camera.id}">
-                    摄像头${camera.id}
-                </button>`
+            const optionsHtml = appState.cameras.map(camera => 
+                `<option value="${camera.id}">${camera.name || '摄像头' + camera.id}</option>`
             ).join('');
 
-            elements.cameraSelector.innerHTML = buttonsHtml;
-
-            // 添加点击事件
-            elements.cameraSelector.addEventListener('click', handleCameraSelection);
+            elements.cameraSelect.innerHTML = optionsHtml;
         }
 
-        // 处理摄像头选择
-        function handleCameraSelection(event) {
-            if (!event.target.classList.contains('camera-btn')) return;
+        // 设置事件监听器
+        function setupEventListeners() {
+            elements.cameraSelect.addEventListener('change', handleCameraChange);
+            elements.takePhotoBtn.addEventListener('click', handleTakePhoto);
+            elements.saveMarksBtn.addEventListener('click', handleSaveMarks);
+            elements.resetMarksBtn.addEventListener('click', handleResetMarks);
+            
+            // 图片拖拽事件
+            setupImageDragEvents();
+        }
 
-            const cameraId = event.target.dataset.cameraId;
-            selectCamera(cameraId);
+        // 设置图片拖拽事件
+        function setupImageDragEvents() {
+            elements.imageContainer.addEventListener('mousedown', handleDragStart);
+            elements.imageContainer.addEventListener('mousemove', handleDragMove);
+            elements.imageContainer.addEventListener('mouseup', handleDragEnd);
+            elements.imageContainer.addEventListener('mouseleave', handleDragEnd);
+            
+            // 防止图片被拖拽
+            elements.imageContainer.addEventListener('dragstart', (e) => e.preventDefault());
+        }
+
+        // 开始拖拽
+        function handleDragStart(e) {
+            if (e.target.classList.contains('mark-point')) return;
+            
+            appState.isDragging = true;
+            appState.dragStart.x = e.clientX;
+            appState.dragStart.y = e.clientY;
+            appState.scrollStart.x = elements.imageContainer.scrollLeft;
+            appState.scrollStart.y = elements.imageContainer.scrollTop;
+            
+            elements.imageContainer.classList.add('dragging');
+            e.preventDefault();
+        }
+
+        // 拖拽移动
+        function handleDragMove(e) {
+            if (!appState.isDragging) return;
+            
+            const deltaX = e.clientX - appState.dragStart.x;
+            const deltaY = e.clientY - appState.dragStart.y;
+            
+            elements.imageContainer.scrollLeft = appState.scrollStart.x - deltaX;
+            elements.imageContainer.scrollTop = appState.scrollStart.y - deltaY;
+            
+            e.preventDefault();
+        }
+
+        // 结束拖拽
+        function handleDragEnd(e) {
+            appState.isDragging = false;
+            elements.imageContainer.classList.remove('dragging');
+        }
+
+        // 处理摄像头选择变化
+        async function handleCameraChange(event) {
+            const cameraId = event.target.value;
+            if (cameraId) {
+                await selectCamera(cameraId);
+            }
         }
 
         // 选择摄像头
         async function selectCamera(cameraId) {
             try {
-                // 更新UI状态
-                document.querySelectorAll('.camera-btn').forEach(btn => {
-                    btn.classList.remove('active');
-                });
-                document.querySelector(`[data-camera-id="${cameraId}"]`).classList.add('active');
-
-                // 设置当前摄像头
                 appState.currentCamera = cameraId;
                 
                 // 加载摄像头配置和标记
@@ -518,11 +515,137 @@
             }
         }
 
-        // 设置事件监听器
-        function setupEventListeners() {
-            elements.takePhotoBtn.addEventListener('click', handleTakePhoto);
-            elements.saveMarksBtn.addEventListener('click', handleSaveMarks);
-            elements.resetMarksBtn.addEventListener('click', handleResetMarks);
+        // 加载摄像头图片
+        async function loadCameraImage(cameraId) {
+            try {
+                const imageFileName = `camera_${cameraId}.png`;
+                const imageUrl = `/image/${imageFileName}`;
+                
+                // 检查图片是否存在
+                const response = await fetch(imageUrl, { method: 'HEAD' });
+                
+                if (response.ok) {
+                    displayImageWithMarks(imageUrl);
+                    console.log('加载摄像头图片:', imageFileName);
+                } else {
+                    showPlaceholder(`摄像头 ${cameraId} 没有图片，请先拍照`);
+                }
+            } catch (error) {
+                console.error('加载摄像头图片失败:', error);
+                showPlaceholder(`摄像头 ${cameraId} 图片加载失败`);
+            }
+        }
+
+        // 显示占位符
+        function showPlaceholder(message) {
+            elements.placeholder.innerHTML = `${message}<br><small>点击拍照按钮获取图片</small>`;
+            elements.placeholder.style.display = 'block';
+            appState.imageLoaded = false;
+        }
+
+        // 显示图片并标记位置
+        function displayImageWithMarks(imageUrl) {
+            const img = document.createElement('img');
+            img.src = imageUrl + '?t=' + Date.now();
+            img.className = 'current-image';
+            img.alt = '摄像头图片';
+            
+            img.onload = () => {
+                // 创建图片包装器
+                const wrapper = document.createElement('div');
+                wrapper.className = 'image-wrapper';
+                wrapper.appendChild(img);
+                
+                // 清空容器并添加图片
+                elements.imageContainer.innerHTML = '';
+                elements.imageContainer.appendChild(wrapper);
+                
+                // 隐藏占位符
+                elements.placeholder.style.display = 'none';
+                
+                // 添加标记点和矩形框
+                addMarkPointsToImage(wrapper);
+                
+                appState.imageLoaded = true;
+                console.log('图片和标记加载成功');
+            };
+            
+            img.onerror = () => {
+                showError('图片加载失败');
+                showPlaceholder('图片加载失败，请重新拍照');
+                console.error('图片加载失败:', imageUrl);
+            };
+        }
+
+        // 在图片上添加标记点
+        function addMarkPointsToImage(wrapper) {
+            const positions = Object.keys(positionMap);
+            
+            positions.forEach(pos => {
+                const markData = appState.marks[pos];
+                if (markData && markData.marked && markData.x > 0 && markData.y > 0) {
+                    createMarkPoint(wrapper, pos, markData);
+                    
+                    // 如果有尺寸信息，也创建矩形框
+                    if (markData.width > 0 && markData.height > 0) {
+                        createMarkRect(wrapper, pos, markData);
+                    }
+                }
+            });
+        }
+
+        // 创建标记点
+        function createMarkPoint(wrapper, position, markData) {
+            const markPoint = document.createElement('div');
+            markPoint.className = 'mark-point';
+            markPoint.dataset.position = position;
+            
+            const label = markData.label || positionMap[position];
+            
+            markPoint.innerHTML = `<div class="mark-label">${label}</div>`;
+            
+            // 设置位置
+            markPoint.style.left = markData.x + 'px';
+            markPoint.style.top = markData.y + 'px';
+            
+            // 添加点击事件
+            markPoint.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleMarkPointClick(position, markData);
+            });
+            
+            wrapper.appendChild(markPoint);
+        }
+
+        // 创建标记矩形框
+        function createMarkRect(wrapper, position, markData) {
+            const markRect = document.createElement('div');
+            markRect.className = 'mark-rect';
+            markRect.dataset.position = position;
+            
+            // 设置位置和尺寸
+            markRect.style.left = (markData.x - markData.width/2) + 'px';
+            markRect.style.top = (markData.y - markData.height/2) + 'px';
+            markRect.style.width = markData.width + 'px';
+            markRect.style.height = markData.height + 'px';
+            
+            wrapper.appendChild(markRect);
+        }
+
+        // 处理标记点点击
+        function handleMarkPointClick(position, markData) {
+            const label = markData.label || positionMap[position];
+            const info = `位置: ${label}\n坐标: (${Math.round(markData.x)}, ${Math.round(markData.y)})`;
+            
+            if (markData.width && markData.height) {
+                info += `\n尺寸: ${Math.round(markData.width)} x ${Math.round(markData.height)}`;
+            }
+            
+            if (markData.description) {
+                info += `\n描述: ${markData.description}`;
+            }
+            
+            alert(info);
         }
 
         // 处理拍照
@@ -562,148 +685,6 @@
             }
         }
 
-        // 加载摄像头图片
-        async function loadCameraImage(cameraId) {
-            try {
-                // 根据摄像头ID构建图片文件名
-                const imageFileName = `camera_${cameraId}.png`;
-                const imageUrl = `/image/${imageFileName}`;
-                
-                // 检查图片是否存在
-                const response = await fetch(imageUrl, { method: 'HEAD' });
-                
-                if (response.ok) {
-                    // 图片存在，直接加载
-                    displayImageWithMarks(imageUrl);
-                    console.log('加载摄像头图片:', imageFileName);
-                } else {
-                    // 图片不存在，尝试获取该摄像头的最新图片
-                    await loadLatestCameraImage(cameraId);
-                }
-            } catch (error) {
-                console.error('加载摄像头图片失败:', error);
-                // 如果网络请求失败，也尝试获取最新图片
-                await loadLatestCameraImage(cameraId);
-            }
-        }
-
-        // 加载最新的摄像头图片（备用方案）
-        async function loadLatestCameraImage(cameraId) {
-            try {
-                // 获取摄像头的图片列表
-                const response = await fetch(`/api/photos/${cameraId}?limit=1`);
-                const result = await response.json();
-                
-                if (result.status === 'success' && result.data.photos.length > 0) {
-                    // 使用最新的图片
-                    const latestPhoto = result.data.photos[0];
-                    const imageUrl = latestPhoto.image_url;
-                    displayImageWithMarks(imageUrl);
-                    console.log('加载最新图片:', latestPhoto.filename);
-                } else {
-                    // 没有图片时显示占位符
-                    showImagePlaceholder(`摄像头 ${cameraId} 没有找到图片，请先拍照`);
-                    console.log('摄像头', cameraId, '没有找到图片');
-                }
-            } catch (error) {
-                console.error('加载最新图片失败:', error);
-                showImagePlaceholder(`摄像头 ${cameraId} 加载图片失败，请先拍照`);
-            }
-        }
-
-        // 显示图片占位符
-        function showImagePlaceholder(message) {
-            elements.imageContainer.innerHTML = `
-                <div class="placeholder-text">
-                    ${message}<br>
-                    <small>选择摄像头后点击拍照按钮获取图片</small>
-                </div>
-            `;
-            appState.imageLoaded = false;
-        }
-
-        // 显示图片并标记位置
-        function displayImageWithMarks(imageUrl) {
-            const img = document.createElement('img');
-            img.src = imageUrl + '?t=' + Date.now(); // 防止缓存
-            img.className = 'current-image';
-            img.alt = '摄像头图片';
-            
-            img.onload = () => {
-                // 清空容器并添加图片
-                elements.imageContainer.innerHTML = '';
-                elements.imageContainer.appendChild(img);
-                
-                // 添加标记点
-                addMarkPointsToImage();
-                
-                appState.imageLoaded = true;
-                console.log('图片和标记加载成功');
-            };
-            
-            img.onerror = () => {
-                showError('图片加载失败');
-                showImagePlaceholder('图片加载失败，请重新拍照');
-                console.error('图片加载失败:', imageUrl);
-            };
-        }
-
-        // 在图片上添加标记点
-        function addMarkPointsToImage() {
-            const positions = Object.keys(positionMap);
-            
-            positions.forEach(pos => {
-                const markData = appState.marks[pos];
-                if (markData && markData.marked && markData.x !== undefined && markData.y !== undefined) {
-                    // 确保坐标是有效值（不为0或未定义）
-                    if (markData.x > 0 && markData.y > 0) {
-                        createMarkPoint(pos, markData);
-                    }
-                }
-            });
-        }
-
-        // 创建标记点
-        function createMarkPoint(position, markData) {
-            const markPoint = document.createElement('div');
-            markPoint.className = 'mark-point';
-            markPoint.dataset.position = position;
-            
-            // 使用配置中的label或默认的位置名称
-            const label = markData.label || positionMap[position];
-            
-            markPoint.innerHTML = `
-                <div class="mark-dot"></div>
-                <div class="mark-label">${label}</div>
-            `;
-            
-            // 设置位置（相对于图片容器）
-            // 根据图片的实际显示尺寸来调整标记点位置
-            markPoint.style.left = markData.x + 'px';
-            markPoint.style.top = markData.y + 'px';
-            
-            // 添加点击事件来编辑标记
-            markPoint.addEventListener('click', () => {
-                handleMarkPointClick(position, markData);
-            });
-            
-            elements.imageContainer.appendChild(markPoint);
-            
-            console.log(`添加标记点: ${label} (${markData.x}, ${markData.y})`);
-        }
-
-        // 处理标记点点击
-        function handleMarkPointClick(position, markData) {
-            const label = markData.label || positionMap[position];
-            const info = `位置: ${label}\n坐标: (${markData.x}, ${markData.y})\n尺寸: ${markData.width || 0} x ${markData.height || 0}`;
-            
-            if (markData.description) {
-                info += `\n描述: ${markData.description}`;
-            }
-            
-            alert(info);
-        }
-
         // 处理保存标记
         async function handleSaveMarks() {
             if (!appState.currentCamera) {
@@ -714,27 +695,22 @@
             try {
                 setButtonLoading(elements.saveMarksBtn, true);
                 
-                // 模拟标记数据（实际应用中这里会是真实的标记坐标）
-                const mockMarks = {
-                    marks: {
-                        zhuang_1: { x: 100, y: 100, marked: true },
-                        xian_1: { x: 200, y: 200, marked: true }
-                    }
-                };
-
+                // 这里应该保存实际的标记数据
                 const response = await fetch(`/api/camera/${appState.currentCamera}/marks`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(mockMarks)
+                    body: JSON.stringify({
+                        marks: appState.marks
+                    })
                 });
 
                 const result = await response.json();
                 
                 if (result.status === 'success') {
                     console.log('标记保存成功');
-                    await loadCameraMarks(appState.currentCamera);
+                    alert('标记保存成功！');
                 } else {
                     throw new Error(result.message || '保存标记失败');
                 }
@@ -751,6 +727,12 @@
             if (confirm('确定要重置所有标记吗？')) {
                 appState.marks = {};
                 updateMarkStatus();
+                
+                // 重新显示图片（不显示标记点）
+                if (appState.imageLoaded && appState.currentCamera) {
+                    loadCameraImage(appState.currentCamera);
+                }
+                
                 console.log('标记已重置');
             }
         }
@@ -768,47 +750,6 @@
 
             elements.markedCount.textContent = markedCount;
             elements.unmarkedCount.textContent = positions.length - markedCount;
-
-            // 更新标记列表显示
-            updateMarkList();
-            
-            // 如果图片已加载，更新标记点显示
-            if (appState.imageLoaded) {
-                // 移除现有标记点
-                document.querySelectorAll('.mark-point').forEach(point => point.remove());
-                // 重新添加标记点
-                addMarkPointsToImage();
-            }
-        }
-
-        // 更新标记列表
-        function updateMarkList() {
-            const positions = Object.keys(positionMap);
-            const listHtml = positions.map(pos => {
-                const markData = appState.marks[pos];
-                const isMarked = markData && markData.marked;
-                const statusClass = isMarked ? 'marked' : 'unmarked';
-                
-                let statusText = '暂无标记';
-                if (isMarked) {
-                    // 显示更详细的标记信息
-                    const x = Math.round(markData.x || 0);
-                    const y = Math.round(markData.y || 0);
-                    statusText = `已标记 (${x},${y})`;
-                }
-                
-                // 使用配置中的label或默认名称
-                const displayName = markData && markData.label ? markData.label : positionMap[pos];
-                
-                return `
-                    <div class="mark-item">
-                        <span class="mark-name">${displayName}</span>
-                        <span class="mark-status ${statusClass}">${statusText}</span>
-                    </div>
-                `;
-            }).join('');
-
-            elements.markList.innerHTML = listHtml;
         }
 
         // 设置按钮加载状态
@@ -816,9 +757,11 @@
             if (loading) {
                 button.classList.add('loading');
                 button.disabled = true;
+                button.style.opacity = '0.6';
             } else {
                 button.classList.remove('loading');
                 button.disabled = false;
+                button.style.opacity = '1';
             }
         }
 
