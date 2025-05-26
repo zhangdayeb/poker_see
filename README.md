@@ -69,6 +69,8 @@ POKER/
 └── requirements.txt                # Python依赖包列表
 ```
 
+pip install -r requirements.txt
+
 ## 系统架构说明
 
 ### 核心功能模块
