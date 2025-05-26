@@ -6,16 +6,14 @@
 """
 
 import os
-import sys
-from pathlib import Path
+
 from PIL import Image, ImageDraw
 import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
 
 # 添加项目根目录到Python路径
-current_dir = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(current_dir))
+
 
 from src.core.utils import (
     get_config_dir, get_image_dir, get_result_dir,

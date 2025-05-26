@@ -13,7 +13,7 @@ HTTP服务器核心模块 - 基于BaseHTTPRequestHandler的HTTP服务器
 
 import json
 import os
-import sys
+
 import threading
 import time
 from pathlib import Path
@@ -704,7 +704,7 @@ def run_server_blocking(host: str = 'localhost', port: int = 8000):
 
 if __name__ == "__main__":
     # 直接运行HTTP服务器
-    import sys
+    
     
     host = 'localhost'
     port = 8000

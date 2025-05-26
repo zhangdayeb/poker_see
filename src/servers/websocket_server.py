@@ -493,7 +493,7 @@ def run_websocket_server_blocking(host: str = 'localhost', port: int = 8001):
 
 if __name__ == "__main__":
     # 直接运行WebSocket服务器
-    import sys
+    
     
     host = 'localhost'
     port = 8001

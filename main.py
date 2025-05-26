@@ -14,21 +14,100 @@ import sys
 import time
 import signal
 import argparse
+import os
 from pathlib import Path
-from typing import Dict, Any
 
-# 添加当前目录到Python路径
-current_dir = Path(__file__).parent
-sys.path.insert(0, str(current_dir))
+# 路径设置 - 使用更稳健的方法
+def setup_project_paths():
+    """设置项目路径"""
+    # 获取当前文件的绝对路径
+    current_file = Path(__file__).resolve()
+    project_root = current_file.parent
+    
+    # 将项目根目录添加到Python路径（如果还没有添加）
+    project_root_str = str(project_root)
+    if project_root_str not in sys.path:
+        sys.path.insert(0, project_root_str)
+    
+    # 确保src目录也在路径中（如果存在）
+    src_dir = project_root / "src"
+    if src_dir.exists() and str(src_dir) not in sys.path:
+        sys.path.insert(0, str(src_dir))
+    
+    return project_root
 
-from utils import (
-    get_timestamp, ensure_dirs_exist, get_config_dir, get_image_dir, get_result_dir,
-    log_info, log_success, log_error, log_warning
-)
-from http_server import start_http_server, stop_http_server, get_server_info
-from websocket_server import start_websocket_server, stop_websocket_server, get_websocket_server_info
-from connection_manager import cleanup_all_connections, get_connection_stats
-from config_manager import get_config_status
+# 设置项目路径
+PROJECT_ROOT = setup_project_paths()
+
+# 导入模块时使用try-except处理导入错误
+def safe_import():
+    """安全导入所有需要的模块"""
+    try:
+        from src.core.utils import (
+            get_timestamp, ensure_dirs_exist, get_config_dir, get_image_dir, get_result_dir,
+            log_info, log_success, log_error, log_warning
+        )
+        from src.servers.http_server import start_http_server, stop_http_server, get_server_info
+        from src.servers.websocket_server import start_websocket_server, stop_websocket_server, get_websocket_server_info
+        from src.websocket.connection_manager import cleanup_all_connections, get_connection_stats
+        from src.core.config_manager import get_config_status
+        
+        return {
+            'utils': {
+                'get_timestamp': get_timestamp,
+                'ensure_dirs_exist': ensure_dirs_exist,
+                'get_config_dir': get_config_dir,
+                'get_image_dir': get_image_dir,
+                'get_result_dir': get_result_dir,
+                'log_info': log_info,
+                'log_success': log_success,
+                'log_error': log_error,
+                'log_warning': log_warning
+            },
+            'http_server': {
+                'start_http_server': start_http_server,
+                'stop_http_server': stop_http_server,
+                'get_server_info': get_server_info
+            },
+            'websocket_server': {
+                'start_websocket_server': start_websocket_server,
+                'stop_websocket_server': stop_websocket_server,
+                'get_websocket_server_info': get_websocket_server_info
+            },
+            'connection_manager': {
+                'cleanup_all_connections': cleanup_all_connections,
+                'get_connection_stats': get_connection_stats
+            },
+            'config_manager': {
+                'get_config_status': get_config_status
+            }
+        }
+    except ImportError as e:
+        print(f"❌ 模块导入失败: {e}")
+        print(f"📁 当前工作目录: {os.getcwd()}")
+        print(f"📁 项目根目录: {PROJECT_ROOT}")
+        print(f"🔍 Python路径: {sys.path[:3]}...")  # 只显示前3个路径避免过长
+        
+        # 检查关键目录是否存在
+        src_dir = PROJECT_ROOT / "src"
+        if not src_dir.exists():
+            print(f"❌ src目录不存在: {src_dir}")
+        else:
+            print(f"✅ src目录存在: {src_dir}")
+            
+            # 检查子目录
+            subdirs = ['core', 'servers', 'websocket']
+            for subdir in subdirs:
+                subdir_path = src_dir / subdir
+                if subdir_path.exists():
+                    print(f"✅ {subdir}目录存在: {subdir_path}")
+                else:
+                    print(f"❌ {subdir}目录不存在: {subdir_path}")
+        
+        raise ImportError(f"无法导入必要的模块，请检查项目结构: {e}")
+
+# 导入模块
+modules = safe_import()
 
 class PokerRecognitionSystem:
     """扑克识别系统主类"""
@@ -49,7 +128,7 @@ class PokerRecognitionSystem:
             'log_level': 'INFO'
         }
         
-        log_info("扑克识别系统初始化", "MAIN")
+        modules['utils']['log_info']("扑克识别系统初始化", "MAIN")
     
     def initialize_system(self) -> bool:
         """初始化系统"""
@@ -58,17 +137,21 @@ class PokerRecognitionSystem:
             print("=" * 60)
             
             # 检查和创建必要目录
-            log_info("检查系统目录...", "MAIN")
-            required_dirs = [get_config_dir(), get_image_dir(), get_result_dir()]
-            ensure_dirs_exist(*required_dirs)
+            modules['utils']['log_info']("检查系统目录...", "MAIN")
+            required_dirs = [
+                modules['utils']['get_config_dir'](), 
+                modules['utils']['get_image_dir'](), 
+                modules['utils']['get_result_dir']()
+            ]
+            modules['utils']['ensure_dirs_exist'](*required_dirs)
             
             # 检查配置文件状态
-            config_status = get_config_status()
+            config_status = modules['config_manager']['get_config_status']()
             if config_status['status'] == 'success':
                 data = config_status['data']
-                log_success(f"配置检查完成: {data['total_cameras']} 个摄像头", "MAIN")
+                modules['utils']['log_success'](f"配置检查完成: {data['total_cameras']} 个摄像头", "MAIN")
             else:
-                log_warning("配置文件检查失败，将使用默认配置", "MAIN")
+                modules['utils']['log_warning']("配置文件检查失败，将使用默认配置", "MAIN")
             
             # 显示系统信息
             self._display_system_info()
@@ -76,50 +159,67 @@ class PokerRecognitionSystem:
             return True
             
         except Exception as e:
-            log_error(f"系统初始化失败: {e}", "MAIN")
+            modules['utils']['log_error'](f"系统初始化失败: {e}", "MAIN")
             return False
     
     def start_services(self, http_only: bool = False) -> bool:
         """启动服务"""
         try:
             # 启动HTTP服务器
-            log_info("启动HTTP服务器...", "MAIN")
-            http_result = start_http_server(self.config['http_host'], self.config['http_port'])
+            modules['utils']['log_info']("启动HTTP服务器...", "MAIN")
+            http_result = modules['http_server']['start_http_server'](
+                self.config['http_host'], 
+                self.config['http_port']
+            )
             
             if http_result:
                 self.http_server_running = True
-                log_success(f"HTTP服务器启动成功: http://{self.config['http_host']}:{self.config['http_port']}", "MAIN")
+                modules['utils']['log_success'](
+                    f"HTTP服务器启动成功: http://{self.config['http_host']}:{self.config['http_port']}", 
+                    "MAIN"
+                )
             else:
-                log_error("HTTP服务器启动失败", "MAIN")
+                modules['utils']['log_error']("HTTP服务器启动失败", "MAIN")
                 return False
             
             # 启动WebSocket服务器（如果需要）
             if not http_only and self.config['auto_start_websocket']:
-                log_info("启动WebSocket服务器...", "MAIN")
-                ws_result = start_websocket_server(self.config['websocket_host'], self.config['websocket_port'])
+                modules['utils']['log_info']("启动WebSocket服务器...", "MAIN")
+                ws_result = modules['websocket_server']['start_websocket_server'](
+                    self.config['websocket_host'], 
+                    self.config['websocket_port']
+                )
                 
                 if ws_result['status'] == 'success':
                     self.websocket_server_running = True
-                    log_success(f"WebSocket服务器启动成功: ws://{self.config['websocket_host']}:{self.config['websocket_port']}", "MAIN")
+                    modules['utils']['log_success'](
+                        f"WebSocket服务器启动成功: ws://{self.config['websocket_host']}:{self.config['websocket_port']}", 
+                        "MAIN"
+                    )
                 else:
-                    log_warning(f"WebSocket服务器启动失败: {ws_result.get('message', 'Unknown error')}", "MAIN")
-                    log_warning("系统将以HTTP模式运行", "MAIN")
+                    modules['utils']['log_warning'](
+                        f"WebSocket服务器启动失败: {ws_result.get('message', 'Unknown error')}", 
+                        "MAIN"
+                    )
+                    modules['utils']['log_warning']("系统将以HTTP模式运行", "MAIN")
             
             return True
             
         except Exception as e:
-            log_error(f"启动服务失败: {e}", "MAIN")
+            modules['utils']['log_error'](f"启动服务失败: {e}", "MAIN")
             return False
     
     def _display_system_info(self):
         """显示系统信息"""
         print("📊 系统信息")
         print("-" * 30)
-        print(f"🕐 启动时间: {get_timestamp()}")
-        print(f"📁 配置目录: {get_config_dir()}")
-        print(f"🖼️  图片目录: {get_image_dir()}")
-        print(f"📊 结果目录: {get_result_dir()}")
+        print(f"🕐 启动时间: {modules['utils']['get_timestamp']()}")
+        print(f"📁 项目根目录: {PROJECT_ROOT}")
+        print(f"📁 配置目录: {modules['utils']['get_config_dir']()}")
+        print(f"🖼️  图片目录: {modules['utils']['get_image_dir']()}")
+        print(f"📊 结果目录: {modules['utils']['get_result_dir']()}")
         print(f"🔧 Python版本: {sys.version.split()[0]}")
+        print(f"💻 当前工作目录: {os.getcwd()}")
         
         # 检查依赖库
         deps_status = self._check_dependencies()
@@ -130,19 +230,33 @@ class PokerRecognitionSystem:
         """检查依赖库"""
         try:
             missing_deps = []
+            versions = {}
             
             # 检查websockets库
             try:
                 import websockets
-                websockets_version = websockets.__version__
+                versions['websockets'] = websockets.__version__
             except ImportError:
                 missing_deps.append("websockets")
-                websockets_version = "未安装"
+            
+            # 检查其他关键库
+            try:
+                import asyncio
+                versions['asyncio'] = "内置"
+            except ImportError:
+                missing_deps.append("asyncio")
+            
+            try:
+                from pathlib import Path
+                versions['pathlib'] = "内置"
+            except ImportError:
+                missing_deps.append("pathlib")
             
             if missing_deps:
                 return f"缺少依赖: {', '.join(missing_deps)}"
             else:
-                return f"完整 (websockets: {websockets_version})"
+                version_info = ', '.join([f"{k}: {v}" for k, v in versions.items()])
+                return f"完整 ({version_info})"
                 
         except Exception as e:
             return f"检查失败: {e}"
@@ -178,7 +292,7 @@ class PokerRecognitionSystem:
             signal.signal(signal.SIGINT, self._signal_handler)
             signal.signal(signal.SIGTERM, self._signal_handler)
             
-            log_info("系统运行中，等待服务请求...", "MAIN")
+            modules['utils']['log_info']("系统运行中，等待服务请求...", "MAIN")
             
             # 主循环
             while not self.shutdown_requested:
@@ -194,7 +308,7 @@ class PokerRecognitionSystem:
                     break
                     
         except Exception as e:
-            log_error(f"主循环异常: {e}", "MAIN")
+            modules['utils']['log_error'](f"主循环异常: {e}", "MAIN")
             self.shutdown_requested = True
     
     def _check_services_health(self):
@@ -202,29 +316,29 @@ class PokerRecognitionSystem:
         try:
             # 检查HTTP服务器
             if self.http_server_running:
-                http_info = get_server_info()
+                http_info = modules['http_server']['get_server_info']()
                 if not http_info.get('running', False):
-                    log_warning("HTTP服务器状态异常", "MAIN")
+                    modules['utils']['log_warning']("HTTP服务器状态异常", "MAIN")
             
             # 检查WebSocket服务器
             if self.websocket_server_running:
-                ws_info = get_websocket_server_info()
+                ws_info = modules['websocket_server']['get_websocket_server_info']()
                 if ws_info['status'] != 'success' or not ws_info['data'].get('running', False):
-                    log_warning("WebSocket服务器状态异常", "MAIN")
+                    modules['utils']['log_warning']("WebSocket服务器状态异常", "MAIN")
             
             # 检查连接统计（仅记录，不输出到控制台）
-            conn_stats = get_connection_stats()
+            conn_stats = modules['connection_manager']['get_connection_stats']()
             if conn_stats['status'] == 'success':
                 active_connections = conn_stats['data'].get('current_active', 0)
                 if active_connections > 0:
-                    log_info(f"活跃连接: {active_connections}", "MAIN")
+                    modules['utils']['log_info'](f"活跃连接: {active_connections}", "MAIN")
                     
         except Exception as e:
-            log_error(f"健康检查失败: {e}", "MAIN")
+            modules['utils']['log_error'](f"健康检查失败: {e}", "MAIN")
     
     def _signal_handler(self, signum, frame):
         """信号处理器"""
-        log_info(f"接收到信号 {signum}，准备关闭系统...", "MAIN")
+        modules['utils']['log_info'](f"接收到信号 {signum}，准备关闭系统...", "MAIN")
         self.shutdown_requested = True
     
     def shutdown_system(self):
@@ -234,33 +348,36 @@ class PokerRecognitionSystem:
             
             # 关闭WebSocket服务器
             if self.websocket_server_running:
-                log_info("关闭WebSocket服务器...", "MAIN")
-                ws_result = stop_websocket_server()
+                modules['utils']['log_info']("关闭WebSocket服务器...", "MAIN")
+                ws_result = modules['websocket_server']['stop_websocket_server']()
                 if ws_result['status'] == 'success':
-                    log_success("WebSocket服务器已关闭", "MAIN")
+                    modules['utils']['log_success']("WebSocket服务器已关闭", "MAIN")
                 else:
-                    log_warning(f"WebSocket服务器关闭异常: {ws_result.get('message', 'Unknown')}", "MAIN")
+                    modules['utils']['log_warning'](
+                        f"WebSocket服务器关闭异常: {ws_result.get('message', 'Unknown')}", 
+                        "MAIN"
+                    )
                 self.websocket_server_running = False
             
             # 关闭HTTP服务器
             if self.http_server_running:
-                log_info("关闭HTTP服务器...", "MAIN")
-                http_result = stop_http_server()
+                modules['utils']['log_info']("关闭HTTP服务器...", "MAIN")
+                http_result = modules['http_server']['stop_http_server']()
                 if http_result:
-                    log_success("HTTP服务器已关闭", "MAIN")
+                    modules['utils']['log_success']("HTTP服务器已关闭", "MAIN")
                 else:
-                    log_warning("HTTP服务器关闭异常", "MAIN")
+                    modules['utils']['log_warning']("HTTP服务器关闭异常", "MAIN")
                 self.http_server_running = False
             
             # 清理连接
-            log_info("清理系统资源...", "MAIN")
-            cleanup_all_connections()
+            modules['utils']['log_info']("清理系统资源...", "MAIN")
+            modules['connection_manager']['cleanup_all_connections']()
             
-            log_success("系统关闭完成", "MAIN")
+            modules['utils']['log_success']("系统关闭完成", "MAIN")
             print("👋 扑克识别系统已安全关闭")
             
         except Exception as e:
-            log_error(f"关闭系统时出错: {e}", "MAIN")
+            modules['utils']['log_error'](f"关闭系统时出错: {e}", "MAIN")
             print(f"⚠️ 系统关闭过程中出现错误: {e}")
 
 def parse_arguments():
@@ -275,6 +392,7 @@ def parse_arguments():
   python main.py --websocket-port 8002   # 指定WebSocket端口
   python main.py --http-only             # 仅启动HTTP服务器
   python main.py --host 0.0.0.0          # 监听所有网络接口
+  python main.py --check-paths           # 检查路径配置
         """
     )
     
@@ -288,15 +406,55 @@ def parse_arguments():
                        help='仅启动HTTP服务器，不启动WebSocket服务器')
     parser.add_argument('--no-websocket', action='store_true',
                        help='禁用WebSocket服务器')
-    parser.add_argument('--version', action='version', version='扑克识别系统 v2.0')
+    parser.add_argument('--check-paths', action='store_true',
+                       help='检查路径配置并退出')
+    parser.add_argument('--version', action='version', version='扑克识别系统 v2.1')
     
     return parser.parse_args()
+
+def check_project_structure():
+    """检查项目结构"""
+    print("🔍 检查项目结构...")
+    print("=" * 50)
+    
+    print(f"📁 项目根目录: {PROJECT_ROOT}")
+    print(f"💻 当前工作目录: {os.getcwd()}")
+    print(f"🐍 Python可执行文件: {sys.executable}")
+    print(f"🔍 Python路径前5个: {sys.path[:5]}")
+    
+    # 检查关键目录和文件
+    structure_checks = [
+        ("src", "源代码目录"),
+        ("src/core", "核心模块目录"),
+        ("src/servers", "服务器模块目录"),
+        ("src/websocket", "WebSocket模块目录"),
+        ("src/core/utils.py", "工具模块"),
+        ("src/core/config_manager.py", "配置管理模块"),
+        ("src/servers/http_server.py", "HTTP服务器模块"),
+        ("src/servers/websocket_server.py", "WebSocket服务器模块"),
+        ("src/websocket/connection_manager.py", "连接管理模块"),
+    ]
+    
+    print("\n📋 目录结构检查:")
+    for path_str, desc in structure_checks:
+        path = PROJECT_ROOT / path_str
+        if path.exists():
+            print(f"✅ {desc}: {path}")
+        else:
+            print(f"❌ {desc}: {path} (不存在)")
+    
+    print("=" * 50)
 
 def main():
     """主函数"""
     try:
         # 解析命令行参数
         args = parse_arguments()
+        
+        # 如果只是检查路径，执行检查后退出
+        if args.check_paths:
+            check_project_structure()
+            return 0
         
         # 创建系统实例
         system = PokerRecognitionSystem()
@@ -336,7 +494,12 @@ def main():
         return 0
     except Exception as e:
         print(f"❌ 程序异常: {e}")
-        log_error(f"主程序异常: {e}", "MAIN")
+        print(f"📍 异常位置: {type(e).__name__}")
+        try:
+            modules['utils']['log_error'](f"主程序异常: {e}", "MAIN")
+        except:
+            # 如果连日志都无法记录，直接输出
+            print(f"无法记录日志: {e}")
         return 1
 
 if __name__ == "__main__":
