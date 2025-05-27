@@ -132,9 +132,50 @@
             pointer-events: none;
         }
 
+        /* 标记模式选择 */
+        .mark-mode-panel {
+            background: #2c3e50;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid #34495e;
+        }
+
+        .mark-mode-label {
+            color: #ecf0f1;
+            font-weight: bold;
+        }
+
+        .position-btn {
+            background: #34495e;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+            margin-right: 8px;
+        }
+
+        .position-btn:hover {
+            background: #4a5f7a;
+        }
+
+        .position-btn.active {
+            background: #f39c12;
+            color: white;
+            box-shadow: 0 2px 8px rgba(243, 156, 18, 0.4);
+        }
+
+        .position-btn.marked {
+            background: #27ae60;
+        }
+
         /* 主要内容区域 */
         .main-content {
-            height: calc(100vh - 160px);
+            height: calc(100vh - 220px);
             background: #f5f6fa;
             position: relative;
             overflow: hidden;
@@ -151,6 +192,10 @@
 
         .image-container.dragging {
             cursor: grabbing;
+        }
+
+        .image-container.marking {
+            cursor: crosshair;
         }
 
         .image-wrapper {
@@ -179,59 +224,85 @@
             font-size: 1.2rem;
         }
 
-        /* 标记点样式 */
-        .mark-point {
+        /* 标记框样式 */
+        .mark-box {
+            position: relative;
+            cursor: move;
+        }
+
+        .mark-box .mark-label {
             position: absolute;
-            width: 24px;
-            height: 24px;
-            background: #e74c3c;
-            border: 3px solid #fff;
-            border-radius: 50%;
-            cursor: pointer;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            z-index: 100;
-            transition: all 0.3s ease;
-        }
-
-        .mark-point:hover {
-            background: #c0392b;
-            transform: translate(-50%, -50%) scale(1.2);
-        }
-
-        .mark-point.active {
-            background: #f39c12;
-            border-color: #f1c40f;
-        }
-
-        /* 标记标签 */
-        .mark-label {
-            position: absolute;
-            top: 30px;
-            left: 50%;
-            transform: translateX(-50%);
+            top: -25px;
+            left: 0;
             background: rgba(0,0,0,0.8);
             color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
             white-space: nowrap;
             pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.3s ease;
         }
 
-        .mark-point:hover .mark-label {
-            opacity: 1;
-        }
-
-        /* 标记矩形框 */
-        .mark-rect {
+        /* 调整大小手柄 */
+        .resize-handle {
             position: absolute;
-            border: 2px dashed #e74c3c;
-            background: rgba(231, 76, 60, 0.1);
+            width: 8px;
+            height: 8px;
+            background: #fff;
+            border: 1px solid #e74c3c;
+            z-index: 101;
+        }
+
+        .resize-nw {
+            top: -4px;
+            left: -4px;
+            cursor: nw-resize;
+        }
+
+        .resize-ne {
+            top: -4px;
+            right: -4px;
+            cursor: ne-resize;
+        }
+
+        .resize-sw {
+            bottom: -4px;
+            left: -4px;
+            cursor: sw-resize;
+        }
+
+        .resize-se {
+            bottom: -4px;
+            right: -4px;
+            cursor: se-resize;
+        }
+
+        /* 临时选择框样式 */
+        .temp-selection-box {
+            position: absolute;
+            border: 2px dashed #f39c12;
+            background: rgba(243, 156, 18, 0.2);
             pointer-events: none;
-            z-index: 50;
+            z-index: 150;
+        }
+
+        /* 标记提示 */
+        .mark-instruction {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(243, 156, 18, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 200;
+            display: none;
+        }
+
+        .mark-instruction.show {
+            display: block;
         }
 
         /* 响应式设计 */
@@ -257,7 +328,12 @@
             }
             
             .main-content {
-                height: calc(100vh - 140px);
+                height: calc(100vh - 200px);
+            }
+
+            .position-btn {
+                padding: 6px 12px;
+                font-size: 11px;
             }
         }
 
@@ -313,8 +389,24 @@
             </div>
         </div>
 
+        <!-- 标记模式选择面板 -->
+        <div class="mark-mode-panel">
+            <span class="mark-mode-label">🎯 点击选择要标记的位置:</span>
+            <button class="position-btn" data-position="zhuang_1">庄1</button>
+            <button class="position-btn" data-position="zhuang_2">庄2</button>
+            <button class="position-btn" data-position="zhuang_3">庄3</button>
+            <button class="position-btn" data-position="xian_1">闲1</button>
+            <button class="position-btn" data-position="xian_2">闲2</button>
+            <button class="position-btn" data-position="xian_3">闲3</button>
+            <span id="currentModeText" style="color: #f39c12; font-weight: bold; margin-left: 15px;">请选择要标记的位置</span>
+        </div>
+
         <!-- 主要内容区域 -->
         <div class="main-content">
+            <div class="mark-instruction" id="markInstruction">
+                点击图片上的位置来标记所选的扑克牌位置
+            </div>
+            
             <div class="image-container" id="imageContainer">
                 <div class="placeholder" id="placeholder">
                     选择摄像头查看图片<br>
@@ -333,7 +425,9 @@
             imageLoaded: false,
             isDragging: false,
             dragStart: { x: 0, y: 0 },
-            scrollStart: { x: 0, y: 0 }
+            scrollStart: { x: 0, y: 0 },
+            currentMarkingPosition: null,  // 当前选择的标记位置
+            isMarkingMode: false           // 是否处于标记模式
         };
 
         // 位置映射
@@ -355,7 +449,10 @@
             unmarkedCount: document.getElementById('unmarkedCount'),
             takePhotoBtn: document.getElementById('takePhotoBtn'),
             saveMarksBtn: document.getElementById('saveMarksBtn'),
-            resetMarksBtn: document.getElementById('resetMarksBtn')
+            resetMarksBtn: document.getElementById('resetMarksBtn'),
+            markInstruction: document.getElementById('markInstruction'),
+            currentModeText: document.getElementById('currentModeText'),
+            positionBtns: document.querySelectorAll('.position-btn')
         };
 
         // 初始化应用
@@ -420,8 +517,16 @@
             elements.saveMarksBtn.addEventListener('click', handleSaveMarks);
             elements.resetMarksBtn.addEventListener('click', handleResetMarks);
             
+            // 位置按钮事件
+            elements.positionBtns.forEach(btn => {
+                btn.addEventListener('click', handlePositionSelect);
+            });
+            
             // 图片拖拽事件
             setupImageDragEvents();
+            
+            // 图片点击标记事件
+            setupImageMarkingEvents();
         }
 
         // 设置图片拖拽事件
@@ -435,9 +540,257 @@
             elements.imageContainer.addEventListener('dragstart', (e) => e.preventDefault());
         }
 
+        // 设置图片标记事件
+        function setupImageMarkingEvents() {
+            elements.imageContainer.addEventListener('mousedown', handleImageMouseDown);
+            elements.imageContainer.addEventListener('mousemove', handleImageMouseMove);
+            elements.imageContainer.addEventListener('mouseup', handleImageMouseUp);
+            elements.imageContainer.addEventListener('mouseleave', handleImageMouseUp);
+        }
+
+        // 处理位置选择
+        function handlePositionSelect(event) {
+            const position = event.target.dataset.position;
+            
+            // 更新按钮状态
+            elements.positionBtns.forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // 更新应用状态
+            appState.currentMarkingPosition = position;
+            appState.isMarkingMode = true;
+            
+            // 更新界面
+            elements.imageContainer.classList.add('marking');
+            elements.markInstruction.classList.add('show');
+            elements.currentModeText.textContent = `当前标记: ${positionMap[position]}`;
+            
+            console.log('选择标记位置:', position);
+        }
+
+        // 处理图片鼠标按下事件（开始拖拽选框）
+        function handleImageMouseDown(event) {
+            // 如果不在标记模式，则执行普通拖拽
+            if (!appState.isMarkingMode) {
+                return handleDragStart(event);
+            }
+            
+            // 如果点击的是现有的标记框，则开始拖拽或调整大小
+            if (event.target.classList.contains('mark-box') || event.target.classList.contains('resize-handle')) {
+                return;
+            }
+            
+            // 开始创建新的标记框
+            startBoxSelection(event);
+        }
+        
+        // 开始框选
+        function startBoxSelection(event) {
+            const image = elements.imageContainer.querySelector('.current-image');
+            if (!image) return;
+            
+            const imageRect = image.getBoundingClientRect();
+            const containerRect = elements.imageContainer.getBoundingClientRect();
+            
+            // 计算相对于图片的坐标
+            const x = event.clientX - imageRect.left + elements.imageContainer.scrollLeft;
+            const y = event.clientY - imageRect.top + elements.imageContainer.scrollTop;
+            
+            // 创建选择框状态
+            appState.boxSelection = {
+                isSelecting: true,
+                startX: x,
+                startY: y,
+                currentX: x,
+                currentY: y,
+                element: null
+            };
+            
+            // 创建临时选择框
+            createTempSelectionBox(x, y);
+            
+            event.preventDefault();
+        }
+        
+        // 创建临时选择框
+        function createTempSelectionBox(x, y) {
+            const wrapper = elements.imageContainer.querySelector('.image-wrapper');
+            if (!wrapper) return;
+            
+            const selectionBox = document.createElement('div');
+            selectionBox.className = 'temp-selection-box';
+            selectionBox.style.cssText = `
+                position: absolute;
+                left: ${x}px;
+                top: ${y}px;
+                width: 0px;
+                height: 0px;
+                border: 2px dashed #f39c12;
+                background: rgba(243, 156, 18, 0.2);
+                z-index: 150;
+                pointer-events: none;
+            `;
+            
+            wrapper.appendChild(selectionBox);
+            appState.boxSelection.element = selectionBox;
+        }
+        
+        // 处理鼠标移动（更新选择框）
+        function handleImageMouseMove(event) {
+            // 如果在选择框模式
+            if (appState.boxSelection && appState.boxSelection.isSelecting) {
+                updateSelectionBox(event);
+                return;
+            }
+            
+            // 普通拖拽模式
+            if (appState.isDragging) {
+                handleDragMove(event);
+            }
+        }
+        
+        // 更新选择框
+        function updateSelectionBox(event) {
+            if (!appState.boxSelection || !appState.boxSelection.element) return;
+            
+            const image = elements.imageContainer.querySelector('.current-image');
+            if (!image) return;
+            
+            const imageRect = image.getBoundingClientRect();
+            
+            // 计算当前坐标
+            const currentX = event.clientX - imageRect.left + elements.imageContainer.scrollLeft;
+            const currentY = event.clientY - imageRect.top + elements.imageContainer.scrollTop;
+            
+            appState.boxSelection.currentX = currentX;
+            appState.boxSelection.currentY = currentY;
+            
+            // 计算选择框的位置和尺寸
+            const left = Math.min(appState.boxSelection.startX, currentX);
+            const top = Math.min(appState.boxSelection.startY, currentY);
+            const width = Math.abs(currentX - appState.boxSelection.startX);
+            const height = Math.abs(currentY - appState.boxSelection.startY);
+            
+            // 更新选择框样式
+            const box = appState.boxSelection.element;
+            box.style.left = left + 'px';
+            box.style.top = top + 'px';
+            box.style.width = width + 'px';
+            box.style.height = height + 'px';
+        }
+        
+        // 处理鼠标抬起（完成选择框）
+        function handleImageMouseUp(event) {
+            // 如果在选择框模式
+            if (appState.boxSelection && appState.boxSelection.isSelecting) {
+                finishBoxSelection();
+                return;
+            }
+            
+            // 普通拖拽模式
+            handleDragEnd(event);
+        }
+        
+        // 完成框选
+        function finishBoxSelection() {
+            if (!appState.boxSelection || !appState.boxSelection.element) return;
+            
+            const box = appState.boxSelection.element;
+            const width = parseInt(box.style.width);
+            const height = parseInt(box.style.height);
+            
+            // 只有当框选区域足够大时才创建标记
+            if (width > 10 && height > 10) {
+                const left = parseInt(box.style.left);
+                const top = parseInt(box.style.top);
+                const centerX = left + width / 2;
+                const centerY = top + height / 2;
+                
+                // 创建标记
+                markPosition(appState.currentMarkingPosition, centerX, centerY, width, height);
+            }
+            
+            // 清理临时选择框
+            box.remove();
+            appState.boxSelection = null;
+        }
+
+        // 标记位置
+        function markPosition(position, x, y, width = 50, height = 70) {
+            if (!position) return;
+            
+            // 更新标记数据
+            if (!appState.marks[position]) {
+                appState.marks[position] = {};
+            }
+            
+            appState.marks[position] = {
+                x: Math.round(x),
+                y: Math.round(y),
+                width: Math.round(width),
+                height: Math.round(height),
+                marked: true,
+                label: positionMap[position],
+                description: `${positionMap[position]}位置`,
+                updated_at: new Date().toISOString(),
+                validation_passed: true
+            };
+            
+            // 重新显示标记框
+            redrawMarkBoxes();
+            
+            // 更新状态
+            updateMarkStatus();
+            
+            // 更新位置按钮状态
+            const positionBtn = document.querySelector(`[data-position="${position}"]`);
+            if (positionBtn) {
+                positionBtn.classList.add('marked');
+            }
+            
+            // 退出标记模式
+            exitMarkingMode();
+            
+            console.log('标记完成:', position, appState.marks[position]);
+        }
+
+        // 退出标记模式
+        function exitMarkingMode() {
+            appState.isMarkingMode = false;
+            appState.currentMarkingPosition = null;
+            
+            elements.imageContainer.classList.remove('marking');
+            elements.markInstruction.classList.remove('show');
+            elements.currentModeText.textContent = '请选择要标记的位置';
+            
+            // 移除按钮激活状态
+            elements.positionBtns.forEach(btn => {
+                btn.classList.remove('active');
+            });
+        }
+
+        // 重新绘制标记框
+        function redrawMarkBoxes() {
+            const wrapper = elements.imageContainer.querySelector('.image-wrapper');
+            if (!wrapper) return;
+            
+            // 移除现有标记框
+            wrapper.querySelectorAll('.mark-box').forEach(el => el.remove());
+            
+            // 添加新的标记框
+            Object.keys(appState.marks).forEach(position => {
+                const markData = appState.marks[position];
+                if (markData && markData.marked) {
+                    createMarkBox(wrapper, position, markData);
+                }
+            });
+        }
+
         // 开始拖拽
         function handleDragStart(e) {
-            if (e.target.classList.contains('mark-point')) return;
+            if (e.target.classList.contains('mark-point') || appState.isMarkingMode) return;
             
             appState.isDragging = true;
             appState.dragStart.x = e.clientX;
@@ -464,7 +817,12 @@
 
         // 结束拖拽
         function handleDragEnd(e) {
-            appState.isDragging = false;
+            if (appState.isDragging) {
+                // 延迟重置拖拽状态，避免与点击事件冲突
+                setTimeout(() => {
+                    appState.isDragging = false;
+                }, 100);
+            }
             elements.imageContainer.classList.remove('dragging');
         }
 
@@ -504,6 +862,7 @@
                     const camera = result.data.camera;
                     appState.marks = camera.mark_positions || {};
                     updateMarkStatus();
+                    updatePositionButtons();
                     console.log('加载摄像头标记:', cameraId);
                 } else {
                     console.warn('加载摄像头标记失败:', result.message);
@@ -515,7 +874,19 @@
             }
         }
 
-        // 加载摄像头图片 - 修复版本：去掉HEAD检查，直接加载图片
+        // 更新位置按钮状态
+        function updatePositionButtons() {
+            elements.positionBtns.forEach(btn => {
+                const position = btn.dataset.position;
+                btn.classList.remove('marked');
+                
+                if (appState.marks[position] && appState.marks[position].marked) {
+                    btn.classList.add('marked');
+                }
+            });
+        }
+
+        // 加载摄像头图片
         async function loadCameraImage(cameraId) {
             try {
                 const imageFileName = `camera_${cameraId}.png`;
@@ -539,10 +910,10 @@
             appState.imageLoaded = false;
         }
 
-        // 显示图片并标记位置 - 优化版本：更好的错误处理
+        // 显示图片并标记位置
         function displayImageWithMarks(imageUrl) {
             const img = document.createElement('img');
-            img.src = imageUrl + '?t=' + Date.now(); // 添加时间戳避免缓存
+            img.src = imageUrl + '?t=' + Date.now();
             img.className = 'current-image';
             img.alt = '摄像头图片';
             
@@ -574,75 +945,175 @@
             };
         }
 
-        // 在图片上添加标记点
+        // 在图片上添加标记框
         function addMarkPointsToImage(wrapper) {
             const positions = Object.keys(positionMap);
             
             positions.forEach(pos => {
                 const markData = appState.marks[pos];
                 if (markData && markData.marked && markData.x > 0 && markData.y > 0) {
-                    createMarkPoint(wrapper, pos, markData);
-                    
-                    // 如果有尺寸信息，也创建矩形框
-                    if (markData.width > 0 && markData.height > 0) {
-                        createMarkRect(wrapper, pos, markData);
-                    }
+                    createMarkBox(wrapper, pos, markData);
                 }
             });
         }
 
-        // 创建标记点
-        function createMarkPoint(wrapper, position, markData) {
-            const markPoint = document.createElement('div');
-            markPoint.className = 'mark-point';
-            markPoint.dataset.position = position;
+        // 创建标记框（可拖拽和调整大小）
+        function createMarkBox(wrapper, position, markData) {
+            const markBox = document.createElement('div');
+            markBox.className = 'mark-box';
+            markBox.dataset.position = position;
             
             const label = markData.label || positionMap[position];
             
-            markPoint.innerHTML = `<div class="mark-label">${label}</div>`;
-            
-            // 设置位置
-            markPoint.style.left = markData.x + 'px';
-            markPoint.style.top = markData.y + 'px';
-            
-            // 添加点击事件
-            markPoint.addEventListener('click', (e) => {
-                e.stopPropagation();
-                handleMarkPointClick(position, markData);
-            });
-            
-            wrapper.appendChild(markPoint);
-        }
-
-        // 创建标记矩形框
-        function createMarkRect(wrapper, position, markData) {
-            const markRect = document.createElement('div');
-            markRect.className = 'mark-rect';
-            markRect.dataset.position = position;
+            // 标记框样式和内容
+            markBox.innerHTML = `
+                <div class="mark-label">${label}</div>
+                <div class="resize-handle resize-nw"></div>
+                <div class="resize-handle resize-ne"></div>
+                <div class="resize-handle resize-sw"></div>
+                <div class="resize-handle resize-se"></div>
+            `;
             
             // 设置位置和尺寸
-            markRect.style.left = (markData.x - markData.width/2) + 'px';
-            markRect.style.top = (markData.y - markData.height/2) + 'px';
-            markRect.style.width = markData.width + 'px';
-            markRect.style.height = markData.height + 'px';
+            markBox.style.cssText = `
+                position: absolute;
+                left: ${markData.x - markData.width/2}px;
+                top: ${markData.y - markData.height/2}px;
+                width: ${markData.width}px;
+                height: ${markData.height}px;
+                border: 2px solid #e74c3c;
+                background: rgba(231, 76, 60, 0.1);
+                cursor: move;
+                z-index: 100;
+            `;
             
-            wrapper.appendChild(markRect);
+            // 添加标记框事件
+            setupMarkBoxEvents(markBox, position);
+            
+            wrapper.appendChild(markBox);
         }
 
-        // 处理标记点点击
-        function handleMarkPointClick(position, markData) {
-            const label = markData.label || positionMap[position];
-            const info = `位置: ${label}\n坐标: (${Math.round(markData.x)}, ${Math.round(markData.y)})`;
+        // 设置标记框事件（拖拽和调整大小）
+        function setupMarkBoxEvents(markBox, position) {
+            let isDragging = false;
+            let isResizing = false;
+            let resizeType = '';
+            let startX, startY, startLeft, startTop, startWidth, startHeight;
             
-            if (markData.width && markData.height) {
-                info += `\n尺寸: ${Math.round(markData.width)} x ${Math.round(markData.height)}`;
-            }
+            // 框体拖拽
+            markBox.addEventListener('mousedown', (e) => {
+                if (e.target.classList.contains('resize-handle')) {
+                    // 调整大小
+                    isResizing = true;
+                    resizeType = e.target.classList[1]; // resize-nw, resize-ne, etc.
+                } else {
+                    // 拖拽移动
+                    isDragging = true;
+                }
+                
+                startX = e.clientX;
+                startY = e.clientY;
+                startLeft = parseInt(markBox.style.left);
+                startTop = parseInt(markBox.style.top);
+                startWidth = parseInt(markBox.style.width);
+                startHeight = parseInt(markBox.style.height);
+                
+                e.stopPropagation();
+                e.preventDefault();
+            });
             
-            if (markData.description) {
-                info += `\n描述: ${markData.description}`;
-            }
+            // 鼠标移动处理
+            const handleMouseMove = (e) => {
+                if (!isDragging && !isResizing) return;
+                
+                const deltaX = e.clientX - startX;
+                const deltaY = e.clientY - startY;
+                
+                if (isDragging) {
+                    // 拖拽移动
+                    markBox.style.left = (startLeft + deltaX) + 'px';
+                    markBox.style.top = (startTop + deltaY) + 'px';
+                } else if (isResizing) {
+                    // 调整大小
+                    let newLeft = startLeft;
+                    let newTop = startTop;
+                    let newWidth = startWidth;
+                    let newHeight = startHeight;
+                    
+                    switch (resizeType) {
+                        case 'resize-nw':
+                            newLeft = startLeft + deltaX;
+                            newTop = startTop + deltaY;
+                            newWidth = startWidth - deltaX;
+                            newHeight = startHeight - deltaY;
+                            break;
+                        case 'resize-ne':
+                            newTop = startTop + deltaY;
+                            newWidth = startWidth + deltaX;
+                            newHeight = startHeight - deltaY;
+                            break;
+                        case 'resize-sw':
+                            newLeft = startLeft + deltaX;
+                            newWidth = startWidth - deltaX;
+                            newHeight = startHeight + deltaY;
+                            break;
+                        case 'resize-se':
+                            newWidth = startWidth + deltaX;
+                            newHeight = startHeight + deltaY;
+                            break;
+                    }
+                    
+                    // 限制最小尺寸
+                    if (newWidth >= 20 && newHeight >= 20) {
+                        markBox.style.left = newLeft + 'px';
+                        markBox.style.top = newTop + 'px';
+                        markBox.style.width = newWidth + 'px';
+                        markBox.style.height = newHeight + 'px';
+                    }
+                }
+            };
             
-            alert(info);
+            // 鼠标抬起处理
+            const handleMouseUp = () => {
+                if (isDragging || isResizing) {
+                    // 更新标记数据
+                    const left = parseInt(markBox.style.left);
+                    const top = parseInt(markBox.style.top);
+                    const width = parseInt(markBox.style.width);
+                    const height = parseInt(markBox.style.height);
+                    
+                    appState.marks[position] = {
+                        ...appState.marks[position],
+                        x: left + width / 2,
+                        y: top + height / 2,
+                        width: width,
+                        height: height,
+                        updated_at: new Date().toISOString()
+                    };
+                    
+                    console.log('标记框更新:', position, appState.marks[position]);
+                }
+                
+                isDragging = false;
+                isResizing = false;
+                resizeType = '';
+            };
+            
+            // 添加全局事件监听器
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+            
+            // 双击删除
+            markBox.addEventListener('dblclick', (e) => {
+                if (confirm(`确定删除标记 "${positionMap[position]}" 吗？`)) {
+                    delete appState.marks[position];
+                    redrawMarkBoxes();
+                    updateMarkStatus();
+                    updatePositionButtons();
+                    console.log('删除标记:', position);
+                }
+                e.stopPropagation();
+            });
         }
 
         // 处理拍照
@@ -698,7 +1169,6 @@
             try {
                 setButtonLoading(elements.saveMarksBtn, true);
                 
-                // 这里应该保存实际的标记数据
                 const response = await fetch(`/api/camera/${appState.currentCamera}/marks`, {
                     method: 'POST',
                     headers: {
@@ -730,8 +1200,9 @@
             if (confirm('确定要重置所有标记吗？')) {
                 appState.marks = {};
                 updateMarkStatus();
+                updatePositionButtons();
                 
-                // 重新显示图片（不显示标记点）
+                // 重新显示图片（不显示标记框）
                 if (appState.imageLoaded && appState.currentCamera) {
                     loadCameraImage(appState.currentCamera);
                 }
@@ -776,6 +1247,7 @@
         // 更新UI
         function updateUI() {
             updateMarkStatus();
+            updatePositionButtons();
         }
 
         // 页面加载完成后初始化
