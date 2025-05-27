@@ -113,6 +113,9 @@ class ConfigManager:
             if not camera:
                 return format_error_response(f"摄像头ID {camera_id} 不存在", "CAMERA_NOT_FOUND")
             
+            # 关键调试信息：确保能看到找到的摄像头配置
+            print(f"[CONFIG] 找到摄像头 {camera_id}: IP={camera.get('ip', 'NO_IP')}")
+            
             return format_success_response(
                 f"获取摄像头 {camera_id} 配置成功",
                 data={'camera': camera}
@@ -216,7 +219,13 @@ class ConfigManager:
             new_camera = {
                 'id': camera_id,
                 'name': camera_data.get('name', f'摄像头{camera_id}'),
-                'url': camera_data.get('url', ''),
+                'ip': camera_data.get('ip', ''),
+                'username': camera_data.get('username', 'admin'),
+                'password': camera_data.get('password', ''),
+                'port': camera_data.get('port', 554),
+                'stream_path': camera_data.get('stream_path', '/Streaming/Channels/101'),
+                'filename': camera_data.get('filename', f'camera_{camera_id}.png'),
+                'enabled': camera_data.get('enabled', True),
                 'description': camera_data.get('description', ''),
                 'mark_positions': self._get_default_mark_positions(),
                 'created_at': get_timestamp(),
@@ -265,7 +274,7 @@ class ConfigManager:
             for camera in cameras:
                 if camera.get('id') == camera_id:
                     # 更新允许的字段
-                    updatable_fields = ['name', 'url', 'description']
+                    updatable_fields = ['name', 'ip', 'username', 'password', 'port', 'stream_path', 'filename', 'enabled', 'description']
                     for field in updatable_fields:
                         if field in update_data:
                             camera[field] = update_data[field]
@@ -342,7 +351,13 @@ class ConfigManager:
                     {
                         "id": "001",
                         "name": "摄像头1",
-                        "url": "http://192.168.1.100:8080/video",
+                        "ip": "192.168.1.100",
+                        "username": "admin",
+                        "password": "password",
+                        "port": 554,
+                        "stream_path": "/Streaming/Channels/101",
+                        "filename": "camera_001.png",
+                        "enabled": True,
                         "description": "默认摄像头",
                         "mark_positions": self._get_default_mark_positions(),
                         "created_at": get_timestamp(),

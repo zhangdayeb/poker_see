@@ -88,16 +88,25 @@ class IntegratedPhotoController:
             拍照结果
         """
         try:
+            print(f"🎥 [DEBUG] take_photo_by_id 开始，摄像头ID: {camera_id}")
+            
             # 验证摄像头ID
             if not validate_camera_id(camera_id):
                 return format_error_response("摄像头ID格式无效", "INVALID_CAMERA_ID")
             
             # 检查摄像头配置是否存在
+            print(f"🎥 [DEBUG] 正在调用 get_camera_by_id({camera_id})")
             camera_result = get_camera_by_id(camera_id)
+            print(f"🎥 [DEBUG] get_camera_by_id 返回结果: {camera_result}")
+            
             if camera_result['status'] != 'success':
                 return format_error_response(f"摄像头 {camera_id} 配置不存在", "CAMERA_NOT_FOUND")
             
             camera_config = camera_result['data']['camera']
+            print(f"🎥 [DEBUG] 提取的 camera_config: {camera_config}")
+            print(f"🎥 [DEBUG] camera_config 中的 IP: {camera_config.get('ip', 'NOT_FOUND')}")
+            print(f"🎥 [DEBUG] camera_config 中的 username: {camera_config.get('username', 'NOT_FOUND')}")
+            print(f"🎥 [DEBUG] camera_config 中的 password: {camera_config.get('password', 'NOT_FOUND')}")
             
             # 检查是否启用
             if not camera_config.get('enabled', True):
@@ -107,9 +116,12 @@ class IntegratedPhotoController:
             self._update_photo_status(camera_id, 'starting', '开始拍照...')
             
             # 执行拍照
+            print(f"🎥 [DEBUG] 正在调用 _rtsp_photo_capture")
             start_time = time.time()
             photo_result = self._rtsp_photo_capture(camera_id, camera_config)
             duration = round(time.time() - start_time, 2)
+            
+            print(f"🎥 [DEBUG] _rtsp_photo_capture 返回结果: {photo_result}")
             
             if photo_result['success']:
                 # 拍照成功，处理结果
@@ -123,19 +135,33 @@ class IntegratedPhotoController:
                 return format_error_response(f"摄像头 {camera_id} 拍照失败: {error_msg}", "PHOTO_FAILED")
                 
         except Exception as e:
+            print(f"💥 [DEBUG] take_photo_by_id 异常: {e}")
+            import traceback
+            traceback.print_exc()
             self._update_photo_status(camera_id, 'error', str(e))
             log_error(f"摄像头 {camera_id} 拍照过程出错: {e}", "PHOTO_CONTROLLER")
             return format_error_response(f"拍照过程出错: {str(e)}", "PHOTO_ERROR")
     
     def _build_rtsp_url(self, camera_config: Dict[str, Any]) -> str:
         """构建RTSP URL"""
+        print(f"🔗 [DEBUG] _build_rtsp_url 开始构建")
+        
         username = camera_config.get('username', 'admin')
         password = camera_config.get('password', '')
         ip = camera_config.get('ip', '')
         port = camera_config.get('port', 554)
         stream_path = camera_config.get('stream_path', '/Streaming/Channels/101')
         
-        return f"rtsp://{username}:{password}@{ip}:{port}{stream_path}"
+        print(f"🔗 [DEBUG] username: {username}")
+        print(f"🔗 [DEBUG] password: {password}")
+        print(f"🔗 [DEBUG] ip: {ip}")
+        print(f"🔗 [DEBUG] port: {port}")
+        print(f"🔗 [DEBUG] stream_path: {stream_path}")
+        
+        rtsp_url = f"rtsp://{username}:{password}@{ip}:{port}{stream_path}"
+        print(f"🔗 [DEBUG] 构建的完整RTSP URL: {rtsp_url}")
+        
+        return rtsp_url
     
     def _rtsp_photo_capture(self, camera_id: str, camera_config: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -149,6 +175,9 @@ class IntegratedPhotoController:
             拍照结果
         """
         try:
+            print(f"📸 [DEBUG] _rtsp_photo_capture 开始")
+            print(f"📸 [DEBUG] 接收到的 camera_config: {camera_config}")
+            
             if not self.ffmpeg_available:
                 return {
                     'success': False,
@@ -157,17 +186,30 @@ class IntegratedPhotoController:
             
             # 检查必需字段
             required_fields = ['ip', 'username', 'password']
+            print(f"📸 [DEBUG] 开始检查必需字段: {required_fields}")
+            
             for field in required_fields:
-                if not camera_config.get(field):
+                field_value = camera_config.get(field)
+                print(f"📸 [DEBUG] 检查字段 {field}: 值='{field_value}', 类型={type(field_value)}")
+                
+                # 更严格的检查：确保字段存在且不为空字符串
+                if field_value is None or field_value == '' or (isinstance(field_value, str) and field_value.strip() == ''):
+                    print(f"❌ [DEBUG] 字段 {field} 为空或不存在")
                     return {
                         'success': False,
                         'error': f'摄像头配置缺少必需字段: {field}'
                     }
+                else:
+                    print(f"✅ [DEBUG] 字段 {field} 检查通过")
             
             # 构建RTSP URL和输出路径
+            print(f"📸 [DEBUG] 开始构建 RTSP URL")
             rtsp_url = self._build_rtsp_url(camera_config)
+            print(f"📸 [DEBUG] 构建的 RTSP URL: {rtsp_url}")
+            
             filename = f"camera_{camera_id}.png"
             output_path = self.image_dir / filename
+            print(f"📸 [DEBUG] 输出路径: {output_path}")
             
             # 使用与简化版程序完全相同的FFmpeg命令
             cmd = [
@@ -179,11 +221,15 @@ class IntegratedPhotoController:
                 str(output_path)
             ]
             
+            print(f"📸 [DEBUG] FFmpeg命令: {cmd}")
+            
             # 隐藏密码用于日志
             safe_url = rtsp_url.replace(camera_config['password'], '***')
             log_info(f"执行RTSP拍照: {safe_url}", "PHOTO_CONTROLLER")
+            print(f"📸 [DEBUG] 安全URL (用于日志): {safe_url}")
             
             # 执行ffmpeg命令
+            print(f"📸 [DEBUG] 开始执行 FFmpeg 命令...")
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -191,30 +237,47 @@ class IntegratedPhotoController:
                 timeout=20  # 20秒超时，与简化版一致
             )
             
+            print(f"📸 [DEBUG] FFmpeg 执行完成")
+            print(f"📸 [DEBUG] 返回码: {result.returncode}")
+            print(f"📸 [DEBUG] stdout: {result.stdout}")
+            print(f"📸 [DEBUG] stderr: {result.stderr}")
+            
             # 检查结果
             if result.returncode == 0:
-                if output_path.exists() and output_path.stat().st_size > 0:
+                print(f"📸 [DEBUG] FFmpeg 执行成功，检查输出文件")
+                print(f"📸 [DEBUG] 文件是否存在: {output_path.exists()}")
+                
+                if output_path.exists():
                     file_size = output_path.stat().st_size
-                    log_success(f"RTSP拍照成功: {filename} ({file_size/1024:.1f} KB)", "PHOTO_CONTROLLER")
+                    print(f"📸 [DEBUG] 文件大小: {file_size} bytes")
                     
-                    return {
-                        'success': True,
-                        'filename': filename,
-                        'file_path': str(output_path),
-                        'file_size': file_size,
-                        'mode': 'rtsp'
-                    }
-                else:
-                    # 文件未生成或为空
-                    if output_path.exists():
+                    if file_size > 0:
+                        log_success(f"RTSP拍照成功: {filename} ({file_size/1024:.1f} KB)", "PHOTO_CONTROLLER")
+                        
+                        return {
+                            'success': True,
+                            'filename': filename,
+                            'file_path': str(output_path),
+                            'file_size': file_size,
+                            'mode': 'rtsp'
+                        }
+                    else:
+                        print(f"❌ [DEBUG] 文件大小为0")
                         output_path.unlink(missing_ok=True)
+                        return {
+                            'success': False,
+                            'error': '拍照文件为空'
+                        }
+                else:
+                    print(f"❌ [DEBUG] 输出文件不存在")
                     return {
                         'success': False,
-                        'error': '拍照文件未生成或为空'
+                        'error': '拍照文件未生成'
                     }
             else:
                 # ffmpeg执行失败
                 error_msg = result.stderr.strip() if result.stderr else "FFmpeg执行失败"
+                print(f"❌ [DEBUG] FFmpeg执行失败: {error_msg}")
                 log_error(f"FFmpeg执行失败: {error_msg}", "PHOTO_CONTROLLER")
                 return {
                     'success': False,
@@ -222,12 +285,16 @@ class IntegratedPhotoController:
                 }
                 
         except subprocess.TimeoutExpired:
+            print(f"⏰ [DEBUG] FFmpeg执行超时")
             log_error(f"RTSP拍照超时: {camera_id}", "PHOTO_CONTROLLER")
             return {
                 'success': False,
                 'error': 'RTSP拍照超时，请检查网络连接和摄像头状态'
             }
         except Exception as e:
+            print(f"💥 [DEBUG] _rtsp_photo_capture 异常: {e}")
+            import traceback
+            traceback.print_exc()
             log_error(f"RTSP拍照异常: {e}", "PHOTO_CONTROLLER")
             return {
                 'success': False,
