@@ -160,8 +160,12 @@ class Utils:
     @staticmethod
     def get_config_dir() -> Path:
         """获取配置目录"""
-        return Utils.get_project_root() / "config"
-    
+        # 修复：确保使用根目录下的config目录
+        project_root = Utils.get_project_root()
+        config_dir = project_root / "config"
+        print(f"[DEBUG] 配置目录: {config_dir}")
+        return config_dir
+
     @staticmethod
     def get_image_dir() -> Path:
         """获取图片目录"""
@@ -170,7 +174,7 @@ class Utils:
     @staticmethod
     def get_result_dir() -> Path:
         """获取结果目录"""
-        return Utils.get_project_root() / "result"
+        return Utils.get_project_root()  / "src"/ "result"
     
     @staticmethod
     def validate_camera_id(camera_id: str) -> bool:
