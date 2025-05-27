@@ -174,7 +174,7 @@ class Utils:
     @staticmethod
     def get_result_dir() -> Path:
         """获取结果目录"""
-        return Utils.get_project_root()  / "src"/ "result"
+        return Utils.get_project_root()  / "result"
     
     @staticmethod
     def validate_camera_id(camera_id: str) -> bool:
