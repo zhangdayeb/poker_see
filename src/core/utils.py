@@ -169,7 +169,7 @@ class Utils:
     @staticmethod
     def get_image_dir() -> Path:
         """获取图片目录"""
-        return Utils.get_project_root() / "src" / "image"
+        return Utils.get_project_root() / "image"
     
     @staticmethod
     def get_result_dir() -> Path:
