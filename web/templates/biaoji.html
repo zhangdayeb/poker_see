@@ -515,21 +515,17 @@
             }
         }
 
-        // 加载摄像头图片
+        // 加载摄像头图片 - 修复版本：去掉HEAD检查，直接加载图片
         async function loadCameraImage(cameraId) {
             try {
                 const imageFileName = `camera_${cameraId}.png`;
                 const imageUrl = `/image/${imageFileName}`;
                 
-                // 检查图片是否存在
-                const response = await fetch(imageUrl, { method: 'HEAD' });
+                console.log('尝试加载图片:', imageUrl);
                 
-                if (response.ok) {
-                    displayImageWithMarks(imageUrl);
-                    console.log('加载摄像头图片:', imageFileName);
-                } else {
-                    showPlaceholder(`摄像头 ${cameraId} 没有图片，请先拍照`);
-                }
+                // 直接显示图片，让浏览器处理加载成功/失败
+                displayImageWithMarks(imageUrl);
+                
             } catch (error) {
                 console.error('加载摄像头图片失败:', error);
                 showPlaceholder(`摄像头 ${cameraId} 图片加载失败`);
@@ -543,14 +539,16 @@
             appState.imageLoaded = false;
         }
 
-        // 显示图片并标记位置
+        // 显示图片并标记位置 - 优化版本：更好的错误处理
         function displayImageWithMarks(imageUrl) {
             const img = document.createElement('img');
-            img.src = imageUrl + '?t=' + Date.now();
+            img.src = imageUrl + '?t=' + Date.now(); // 添加时间戳避免缓存
             img.className = 'current-image';
             img.alt = '摄像头图片';
             
             img.onload = () => {
+                console.log('图片加载成功:', imageUrl);
+                
                 // 创建图片包装器
                 const wrapper = document.createElement('div');
                 wrapper.className = 'image-wrapper';
@@ -570,10 +568,9 @@
                 console.log('图片和标记加载成功');
             };
             
-            img.onerror = () => {
-                showError('图片加载失败');
-                showPlaceholder('图片加载失败，请重新拍照');
-                console.error('图片加载失败:', imageUrl);
+            img.onerror = (error) => {
+                console.error('图片加载失败:', imageUrl, error);
+                showPlaceholder('图片不存在或加载失败，请重新拍照');
             };
         }
 
@@ -672,7 +669,13 @@
                 
                 if (result.status === 'success') {
                     const imageUrl = result.data.image_url;
-                    displayImageWithMarks(imageUrl);
+                    console.log('拍照成功，加载新图片:', imageUrl);
+                    
+                    // 等待一小段时间确保文件写入完成
+                    setTimeout(() => {
+                        displayImageWithMarks(imageUrl);
+                    }, 500);
+                    
                     console.log('拍照成功:', result.data.filename);
                 } else {
                     throw new Error(result.message || '拍照失败');
