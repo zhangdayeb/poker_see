@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-扑克牌OCR识别模块
-功能: 使用EasyOCR识别扑克牌左上角字符，返回点数
-用法: python poker_ocr.py <图片路径>
-依赖: pip install easyocr
+快速扑克牌OCR识别模块 - PaddleOCR版本
+功能: 使用PaddleOCR识别扑克牌左上角字符，速度比EasyOCR快2-3倍
+用法: python poker_paddle_ocr.py <图片路径>
+依赖: pip install paddlepaddle paddleocr
 """
 
 import sys
@@ -25,24 +25,28 @@ def get_project_root():
     
     return project_root
 
-def load_easyocr_reader():
-    """加载EasyOCR识别器"""
+def load_paddle_ocr():
+    """加载PaddleOCR识别器"""
     try:
-        import easyocr
+        from paddleocr import PaddleOCR
         
-        print("🔧 正在初始化EasyOCR识别器...")
-        print("📥 首次使用可能需要下载模型文件，请稍候...")
+        print("🔧 正在初始化PaddleOCR识别器...")
         
-        # 创建OCR识别器，只识别英文和数字
-        reader = easyocr.Reader(['en'], gpu=False, verbose=False)
+        # 创建OCR识别器 - 只使用英文模式，关闭方向分类器提高速度
+        ocr = PaddleOCR(
+            use_angle_cls=False,  # 关闭角度分类器，提高速度
+            lang='en',           # 只使用英文
+            show_log=False,      # 关闭日志输出
+            use_gpu=False        # 使用CPU，如果有GPU可以改为True
+        )
         
-        print("✅ EasyOCR识别器加载成功")
-        return reader
+        print("✅ PaddleOCR识别器加载成功")
+        return ocr
         
     except ImportError:
-        raise ImportError("请安装EasyOCR库: pip install easyocr")
+        raise ImportError("请安装PaddleOCR库: pip install paddlepaddle paddleocr")
     except Exception as e:
-        raise Exception(f"EasyOCR初始化失败: {str(e)}")
+        raise Exception(f"PaddleOCR初始化失败: {str(e)}")
 
 def normalize_card_character(text):
     """
@@ -81,6 +85,9 @@ def normalize_card_character(text):
         'G': '6',   # G 可能是 6
         'S': '5',   # S 可能是 5
         'T': '10',  # T 在扑克中表示 10
+        '6': '6',   # 6 就是 6
+        'C': '6',   # C 可能是 6
+        'D': 'A',   # D 可能是 A
     }
     
     # 直接映射
@@ -105,7 +112,7 @@ def normalize_card_character(text):
 
 def recognize_poker_character(image_path):
     """
-    使用EasyOCR识别扑克牌字符
+    使用PaddleOCR识别扑克牌字符
     
     Args:
         image_path (str): 图片路径
@@ -123,9 +130,9 @@ def recognize_poker_character(image_path):
         
         print(f"🖼️  正在识别: {image_path}")
         
-        # 加载EasyOCR识别器
+        # 加载PaddleOCR识别器
         try:
-            reader = load_easyocr_reader()
+            ocr = load_paddle_ocr()
         except Exception as e:
             return {
                 "success": False,
@@ -135,15 +142,15 @@ def recognize_poker_character(image_path):
         # 执行OCR识别
         try:
             print("🔍 执行OCR识别...")
-            results = reader.readtext(image_path)
+            results = ocr.ocr(image_path, cls=False)  # 关闭分类器提高速度
         except Exception as e:
             return {
                 "success": False,
                 "error": f"OCR识别失败: {str(e)}"
             }
         
-        # 处理识别结果
-        if not results:
+        # 处理识别结果 - PaddleOCR返回格式: [[[bbox], (text, confidence)], ...]
+        if not results or not results[0]:
             return {
                 "success": False,
                 "error": "未识别到任何文字"
@@ -154,17 +161,20 @@ def recognize_poker_character(image_path):
         best_confidence = 0
         best_text = ""
         
-        for (bbox, text, confidence) in results:
-            detected_texts.append({
-                "text": text,
-                "confidence": round(float(confidence), 3),  # 确保转换为Python float
-                "bbox": [[int(point[0]), int(point[1])] for point in bbox]  # 转换bbox坐标
-            })
-            
-            # 记录置信度最高的文本
-            if confidence > best_confidence:
-                best_confidence = float(confidence)  # 转换为Python float
-                best_text = text
+        for line in results[0]:  # results[0] 是第一页的结果
+            if line:
+                bbox, (text, confidence) = line
+                
+                detected_texts.append({
+                    "text": text,
+                    "confidence": round(float(confidence), 3),
+                    "bbox": [[int(point[0]), int(point[1])] for point in bbox]
+                })
+                
+                # 记录置信度最高的文本
+                if confidence > best_confidence:
+                    best_confidence = float(confidence)
+                    best_text = text
         
         print(f"📝 识别到 {len(detected_texts)} 个文本区域")
         for i, item in enumerate(detected_texts):
@@ -183,7 +193,6 @@ def recognize_poker_character(image_path):
                     image = cv2.imread(image_path)
                     if image is not None:
                         height, width = image.shape[:2]
-                        # 转换numpy类型为Python int类型
                         image_size = {"width": int(width), "height": int(height)}
                     else:
                         image_size = {"width": 0, "height": 0}
@@ -199,7 +208,7 @@ def recognize_poker_character(image_path):
                     "success": True,
                     "character": normalized_char,
                     "original_text": best_text,
-                    "confidence": round(float(best_confidence), 3),  # 确保是Python float
+                    "confidence": round(float(best_confidence), 3),
                     "image_path": image_path,
                     "image_size": image_size,
                     "all_detections": detected_texts,
@@ -224,13 +233,13 @@ def recognize_poker_character(image_path):
 
 def main():
     """主函数"""
-    print("🎴 扑克牌OCR识别器")
-    print("=" * 40)
+    print("🎴 快速扑克牌OCR识别器 (PaddleOCR)")
+    print("=" * 45)
     
     # 检查命令行参数
     if len(sys.argv) != 2:
-        print("用法: python poker_ocr.py <图片路径>")
-        print("示例: python poker_ocr.py src/image/cut/camera_001_zhuang_1_left.png")
+        print("用法: python poker_paddle_ocr.py <图片路径>")
+        print("示例: python poker_paddle_ocr.py src/image/cut/camera_001_zhuang_1_left.png")
         sys.exit(1)
     
     # 获取图片路径
@@ -246,7 +255,7 @@ def main():
     result = recognize_poker_character(image_path)
     
     # 输出结果
-    print("-" * 40)
+    print("-" * 45)
     if result["success"]:
         print("✅ 识别成功!")
         print(f"🎯 识别字符: {result['character']}")
@@ -263,7 +272,7 @@ def main():
         print(f"📛 错误: {result['error']}")
     
     # 输出JSON格式结果（供其他程序调用）
-    print("\n" + "=" * 40)
+    print("\n" + "=" * 45)
     print("JSON结果:")
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
