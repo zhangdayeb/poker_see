@@ -53,14 +53,7 @@ class ConfigManager:
         """初始化配置管理器"""
         self.config_dir = get_config_dir()
         self.config_file = self.config_dir / "camera.json"
-        
-        # 确保配置目录存在
-        self.config_dir.mkdir(parents=True, exist_ok=True)
-        
-        # 如果配置文件不存在，创建默认配置
-        if not self.config_file.exists():
-            self._create_default_config()
-        
+               
         log_info("配置管理器初始化完成", "CONFIG")
     
     def get_all_cameras(self) -> Dict[str, Any]:
@@ -341,38 +334,6 @@ class ConfigManager:
             log_error(f"删除摄像头 {camera_id} 失败: {e}", "CONFIG")
             return format_error_response(f"删除摄像头失败: {str(e)}", "DELETE_CAMERA_ERROR")
     
-    def _create_default_config(self) -> None:
-        """创建默认配置文件"""
-        try:
-            default_config = {
-                "version": "1.0",
-                "created_at": get_timestamp(),
-                "cameras": [
-                    {
-                        "id": "001",
-                        "name": "摄像头1",
-                        "ip": "192.168.1.100",
-                        "username": "admin",
-                        "password": "password",
-                        "port": 554,
-                        "stream_path": "/Streaming/Channels/101",
-                        "filename": "camera_001.png",
-                        "enabled": True,
-                        "description": "默认摄像头",
-                        "mark_positions": self._get_default_mark_positions(),
-                        "created_at": get_timestamp(),
-                        "updated_at": get_timestamp()
-                    }
-                ]
-            }
-            
-            if safe_json_dump(default_config, self.config_file):
-                log_success("创建默认配置文件成功", "CONFIG")
-            else:
-                log_error("创建默认配置文件失败", "CONFIG")
-                
-        except Exception as e:
-            log_error(f"创建默认配置失败: {e}", "CONFIG")
     
     def _get_default_mark_positions(self) -> Dict[str, Any]:
         """获取默认的标记位置配置"""
