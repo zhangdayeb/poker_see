@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎯 扑克位置标记工具 (调试版)</title>
+    <title>🎯 扑克位置标记工具 (修复版)</title>
     <style>
         * {
             margin: 0;
@@ -520,7 +520,8 @@
                 displayHeight: 0,
                 scaleX: 1,
                 scaleY: 1
-            }
+            },
+            boxSelection: null             // 框选状态
         };
 
         // 位置映射
@@ -623,6 +624,34 @@
             debugLog('标记数据', appState.marks);
         }
 
+        // 获取准确的图片相对坐标
+        function getImageRelativeCoordinates(event) {
+            const image = elements.imageContainer.querySelector('.current-image');
+            if (!image) return null;
+
+            // 🔥 关键修复：获取图片相对于其包装器的位置
+            const wrapper = elements.imageContainer.querySelector('.image-wrapper');
+            const wrapperRect = wrapper.getBoundingClientRect();
+            const containerRect = elements.imageContainer.getBoundingClientRect();
+            
+            // 计算相对于图片包装器的坐标
+            const relativeX = event.clientX - wrapperRect.left;
+            const relativeY = event.clientY - wrapperRect.top;
+            
+            debugLog('坐标计算详情', {
+                鼠标屏幕坐标: { clientX: event.clientX, clientY: event.clientY },
+                包装器位置: { left: wrapperRect.left, top: wrapperRect.top },
+                容器位置: { left: containerRect.left, top: containerRect.top },
+                容器滚动: { scrollLeft: elements.imageContainer.scrollLeft, scrollTop: elements.imageContainer.scrollTop },
+                计算结果: { relativeX, relativeY }
+            });
+
+            return {
+                x: relativeX,
+                y: relativeY
+            };
+        }
+
         // 初始化应用
         async function initApp() {
             try {
@@ -707,22 +736,19 @@
                 const image = elements.imageContainer.querySelector('.current-image');
                 if (!image) return;
 
-                const imageRect = image.getBoundingClientRect();
-                const containerRect = elements.imageContainer.getBoundingClientRect();
-                
-                // 计算相对于图片的坐标
-                const relativeX = event.clientX - imageRect.left + elements.imageContainer.scrollLeft;
-                const relativeY = event.clientY - imageRect.top + elements.imageContainer.scrollTop;
+                const coords = getImageRelativeCoordinates(event);
+                if (!coords) return;
 
-                // 计算实际图片坐标（如果有缩放）
-                const actualX = Math.round(relativeX / appState.imageInfo.scaleX);
-                const actualY = Math.round(relativeY / appState.imageInfo.scaleY);
+                // 计算实际图片坐标
+                const actualX = Math.round(coords.x / appState.imageInfo.scaleX);
+                const actualY = Math.round(coords.y / appState.imageInfo.scaleY);
 
                 // 更新调试信息
-                elements.debugMousePos.textContent = `显示:${Math.round(relativeX)},${Math.round(relativeY)} | 实际:${actualX},${actualY}`;
+                elements.debugMousePos.textContent = `显示:${Math.round(coords.x)},${Math.round(coords.y)} | 实际:${actualX},${actualY}`;
 
                 // 显示鼠标位置提示
                 if (appState.isMarkingMode) {
+                    const containerRect = elements.imageContainer.getBoundingClientRect();
                     elements.mousePosition.style.display = 'block';
                     elements.mousePosition.style.left = (event.clientX - containerRect.left + 10) + 'px';
                     elements.mousePosition.style.top = (event.clientY - containerRect.top - 25) + 'px';
@@ -806,23 +832,22 @@
             startBoxSelection(event);
         }
         
-        // 开始框选
+        // 开始框选 - 🔥 修复版本
         function startBoxSelection(event) {
             const image = elements.imageContainer.querySelector('.current-image');
             if (!image) return;
             
-            const imageRect = image.getBoundingClientRect();
-            const containerRect = elements.imageContainer.getBoundingClientRect();
+            // 🔥 使用修复后的坐标获取函数
+            const coords = getImageRelativeCoordinates(event);
+            if (!coords) return;
             
-            // 计算相对于图片的坐标
-            const x = event.clientX - imageRect.left + elements.imageContainer.scrollLeft;
-            const y = event.clientY - imageRect.top + elements.imageContainer.scrollTop;
+            const x = coords.x;
+            const y = coords.y;
             
             debugLog('开始框选', {
-                鼠标位置: { clientX: event.clientX, clientY: event.clientY },
-                图片矩形: { left: imageRect.left, top: imageRect.top, width: imageRect.width, height: imageRect.height },
-                容器滚动: { scrollLeft: elements.imageContainer.scrollLeft, scrollTop: elements.imageContainer.scrollTop },
-                计算坐标: { x, y }
+                鼠标屏幕坐标: { clientX: event.clientX, clientY: event.clientY },
+                计算的相对坐标: { x, y },
+                容器滚动: { scrollLeft: elements.imageContainer.scrollLeft, scrollTop: elements.imageContainer.scrollTop }
             });
             
             // 创建选择框状态
@@ -880,18 +905,19 @@
             }
         }
         
-        // 更新选择框
+        // 更新选择框 - 🔥 修复版本
         function updateSelectionBox(event) {
             if (!appState.boxSelection || !appState.boxSelection.element) return;
             
             const image = elements.imageContainer.querySelector('.current-image');
             if (!image) return;
             
-            const imageRect = image.getBoundingClientRect();
+            // 🔥 使用修复后的坐标获取函数
+            const coords = getImageRelativeCoordinates(event);
+            if (!coords) return;
             
-            // 计算当前坐标
-            const currentX = event.clientX - imageRect.left + elements.imageContainer.scrollLeft;
-            const currentY = event.clientY - imageRect.top + elements.imageContainer.scrollTop;
+            const currentX = coords.x;
+            const currentY = coords.y;
             
             appState.boxSelection.currentX = currentX;
             appState.boxSelection.currentY = currentY;

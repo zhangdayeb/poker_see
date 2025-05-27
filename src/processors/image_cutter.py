@@ -170,49 +170,48 @@ class ImageCutter:
             Dict: 裁剪结果
         """
         try:
-            # 获取标记区域坐标
-            x = int(mark_data['x'])
-            y = int(mark_data['y'])
-            width = int(mark_data['width'])
-            height = int(mark_data['height'])
+            # 获取标记区域坐标 (JSON中保存的是实际图片的中心点坐标)
+            center_x = int(mark_data['x'])  # 中心点X坐标
+            center_y = int(mark_data['y'])  # 中心点Y坐标
+            width = int(mark_data['width'])     # 实际宽度
+            height = int(mark_data['height'])   # 实际高度
             
             # 获取图片实际尺寸
             img_width, img_height = image.size
             
-            log_info(f"🔍 {mark_name} 原始坐标: ({x}, {y}), 尺寸: {width}x{height}", "IMAGE_CUTTER")
+            log_info(f"🔍 {mark_name} JSON坐标(中心点): ({center_x}, {center_y}), 尺寸: {width}x{height}", "IMAGE_CUTTER")
             log_info(f"📐 图片尺寸: {img_width}x{img_height}", "IMAGE_CUTTER")
             
-            # 坐标转换（标记工具中图片固定显示为 2560x1440）
-            display_width = 2560
-            display_height = 1440
+            # 🎯 核心修正：JSON中的坐标已经是实际图片坐标，直接使用
+            # 不需要缩放转换，因为biaoji.html已经保存了实际图片坐标
             
-            # 计算缩放比例
-            scale_x = img_width / display_width
-            scale_y = img_height / display_height
+            # 从中心点坐标转换为左上角坐标 (用于PIL裁剪)
+            left = center_x - width // 2    # 左上角X = 中心X - 宽度/2
+            top = center_y - height // 2    # 左上角Y = 中心Y - 高度/2
+            right = left + width            # 右下角X = 左上角X + 宽度
+            bottom = top + height           # 右下角Y = 左上角Y + 高度
             
-            # 转换坐标到实际图片尺寸
-            actual_x = int(x * scale_x)
-            actual_y = int(y * scale_y)
-            actual_width = int(width * scale_x)
-            actual_height = int(height * scale_y)
-            
-            log_info(f"🔄 缩放比例: X={scale_x:.3f}, Y={scale_y:.3f}", "IMAGE_CUTTER")
-            log_info(f"✂️  转换后坐标: ({actual_x}, {actual_y}), 尺寸: {actual_width}x{actual_height}", "IMAGE_CUTTER")
+            log_info(f"🔄 坐标转换: 中心点({center_x}, {center_y}) -> 左上角({left}, {top})", "IMAGE_CUTTER")
+            log_info(f"✂️  裁剪区域: ({left}, {top}) -> ({right}, {bottom})", "IMAGE_CUTTER")
             
             # 确保坐标在图片范围内
-            actual_x = max(0, min(actual_x, img_width - 1))
-            actual_y = max(0, min(actual_y, img_height - 1))
+            left = max(0, left)
+            top = max(0, top)
+            right = min(right, img_width)
+            bottom = min(bottom, img_height)
             
-            # 确保裁剪区域不超出图片边界
-            right = min(actual_x + actual_width, img_width)
-            bottom = min(actual_y + actual_height, img_height)
+            # 重新计算实际裁剪尺寸(防止边界溢出后尺寸改变)
+            actual_width = right - left
+            actual_height = bottom - top
+            
+            log_info(f"🛡️  边界修正后: ({left}, {top}) -> ({right}, {bottom}), 实际尺寸: {actual_width}x{actual_height}", "IMAGE_CUTTER")
             
             # 确保裁剪区域有效
-            if right <= actual_x or bottom <= actual_y:
-                raise ValueError(f"裁剪区域无效: ({actual_x}, {actual_y}) -> ({right}, {bottom})")
+            if actual_width <= 0 or actual_height <= 0:
+                raise ValueError(f"裁剪区域无效: 宽度={actual_width}, 高度={actual_height}")
             
-            # 裁剪图片
-            cropped = image.crop((actual_x, actual_y, right, bottom))
+            # 裁剪图片 - PIL的crop使用 (left, top, right, bottom)
+            cropped = image.crop((left, top, right, bottom))
             
             # 生成输出文件名
             output_filename = f"camera_{camera_id}_{mark_name}.png"
@@ -232,9 +231,9 @@ class ImageCutter:
                 'path': str(output_path),
                 'size': cropped.size,
                 'file_size': file_size,
-                'original_coords': (x, y, width, height),
-                'actual_coords': (actual_x, actual_y, actual_width, actual_height),
-                'scale': (scale_x, scale_y)
+                'original_coords': (center_x, center_y, width, height),  # 原始中心点坐标
+                'crop_coords': (left, top, right, bottom),               # 实际裁剪坐标
+                'actual_size': (actual_width, actual_height)             # 实际裁剪尺寸
             }
             
         except Exception as e:
