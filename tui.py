@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-实时识别推送系统 - tui.py (重新调整版本)
+实时识别推送系统 - tui.py (新版本)
 业务逻辑:
 1. 读取摄像头配置
 2. 轮询拍照
 3. 轮询裁剪
-4. 轮询识别
+4. 轮询识别 (使用YOLO识别器)
 5. 轮询推送
 """
 
@@ -40,10 +40,6 @@ class TuiSystem:
     def __init__(self):
         """初始化系统"""
         self.shutdown_requested = False
-        
-        # 配置文件路径
-        self.camera_config_file = PROJECT_ROOT / "src" / "config" / "camera.json"
-        self.push_config_file = PROJECT_ROOT / "result" / "push_config.json"
         
         # 系统配置
         self.config = {
@@ -82,15 +78,15 @@ class TuiSystem:
             print("\n📷 步骤1: 读取摄像头配置")
             print("-" * 50)
             
-            if not self.camera_config_file.exists():
-                print(f"❌ 配置文件不存在: {self.camera_config_file}")
+            # 使用配置管理器
+            from src.core.config_manager import get_all_cameras
+            
+            result = get_all_cameras()
+            if result['status'] != 'success':
+                print(f"❌ 获取摄像头配置失败: {result['message']}")
                 return False
             
-            # 读取配置文件
-            with open(self.camera_config_file, 'r', encoding='utf-8') as f:
-                camera_config = json.load(f)
-            
-            cameras = camera_config.get('cameras', [])
+            cameras = result['data']['cameras']
             if not cameras:
                 print("❌ 没有找到摄像头配置")
                 return False
@@ -180,12 +176,14 @@ class TuiSystem:
                 if cut_dir.exists():
                     pattern = f"{image_file.stem}_*.png"
                     cropped_files = list(cut_dir.glob(pattern))
-                    cropped_files.sort(key=lambda x: x.name)
+                    # 过滤掉左上角图片，只要主图片
+                    main_files = [f for f in cropped_files if not f.name.endswith('_left.png')]
+                    main_files.sort(key=lambda x: x.name)
                     
                     return {
                         'success': True,
-                        'cropped_files': [str(f) for f in cropped_files],
-                        'count': len(cropped_files),
+                        'cropped_files': [str(f) for f in main_files],
+                        'count': len(main_files),
                         'duration': duration
                     }
                 else:
@@ -261,8 +259,8 @@ class TuiSystem:
             
             start_time = time.time()
             
-            # 尝试推送到WebSocket
-            push_result = self._push_to_websocket(camera_id, formatted_results)
+            # 尝试推送到识别结果管理器
+            push_result = self._push_to_recognition_manager(formatted_results)
             
             duration = time.time() - start_time
             
@@ -285,66 +283,29 @@ class TuiSystem:
             }
     
     def _recognize_single_image(self, image_path: str) -> Dict[str, Any]:
-        """识别单张图片 - 混合方法"""
+        """识别单张图片 - 使用YOLO识别器"""
         try:
-            # 先尝试YOLO识别
-            yolo_result = self._recognize_with_yolo(image_path)
+            # 使用YOLO识别器
+            from src.processors.poker_recognizer import recognize_poker_card
             
-            # 如果YOLO成功且置信度高，直接返回
-            if yolo_result['success'] and yolo_result.get('confidence', 0) >= 0.8:
+            result = recognize_poker_card(image_path)
+            
+            if result['success']:
                 return {
                     'success': True,
-                    'suit': yolo_result.get('suit', ''),
-                    'rank': yolo_result.get('rank', ''),
-                    'display_name': yolo_result.get('display_name', ''),
-                    'confidence': yolo_result.get('confidence', 0),
+                    'suit': result.get('suit', ''),
+                    'rank': result.get('rank', ''),
+                    'display_name': result.get('display_name', ''),
+                    'confidence': result.get('confidence', 0),
                     'method': 'yolo'
                 }
-            
-            # 尝试OCR识别左上角
-            left_image_path = self._get_left_corner_image(image_path)
-            if left_image_path:
-                ocr_result = self._recognize_with_ocr(left_image_path)
-                
-                if ocr_result['success']:
-                    # 结合YOLO和OCR结果
-                    if yolo_result['success']:
-                        return {
-                            'success': True,
-                            'suit': yolo_result.get('suit', ''),
-                            'rank': ocr_result.get('rank', ''),
-                            'display_name': f"{yolo_result.get('suit_symbol', '')}{ocr_result.get('rank', '')}",
-                            'confidence': (yolo_result.get('confidence', 0) + ocr_result.get('confidence', 0)) / 2,
-                            'method': 'hybrid'
-                        }
-                    else:
-                        return {
-                            'success': True,
-                            'suit': '',
-                            'rank': ocr_result.get('rank', ''),
-                            'display_name': ocr_result.get('rank', ''),
-                            'confidence': ocr_result.get('confidence', 0),
-                            'method': 'ocr'
-                        }
-            
-            # 如果OCR失败但YOLO成功，返回YOLO结果
-            if yolo_result['success']:
+            else:
                 return {
-                    'success': True,
-                    'suit': yolo_result.get('suit', ''),
-                    'rank': yolo_result.get('rank', ''),
-                    'display_name': yolo_result.get('display_name', ''),
-                    'confidence': yolo_result.get('confidence', 0),
-                    'method': 'yolo_fallback'
+                    'success': False,
+                    'error': result.get('error', '识别失败'),
+                    'method': 'yolo'
                 }
-            
-            # 都失败
-            return {
-                'success': False,
-                'error': '识别失败',
-                'method': 'failed'
-            }
-            
+                
         except Exception as e:
             return {
                 'success': False,
@@ -352,57 +313,10 @@ class TuiSystem:
                 'method': 'exception'
             }
     
-    def _recognize_with_yolo(self, image_path: str) -> Dict[str, Any]:
-        """使用YOLO识别"""
-        try:
-            from src.processors.poker_recognizer import recognize_poker_card
-            return recognize_poker_card(image_path)
-        except Exception as e:
-            return {'success': False, 'error': str(e)}
-    
-    def _recognize_with_ocr(self, image_path: str) -> Dict[str, Any]:
-        """使用OCR识别"""
-        try:
-            # 优先使用PaddleOCR
-            try:
-                from src.processors.poker_paddle_ocr import recognize_poker_character
-                result = recognize_poker_character(image_path)
-                if result['success']:
-                    return {
-                        'success': True,
-                        'rank': result['character'],
-                        'confidence': result['confidence']
-                    }
-                else:
-                    raise Exception(result['error'])
-            except ImportError:
-                # 使用EasyOCR
-                from src.processors.poker_ocr import recognize_poker_character
-                result = recognize_poker_character(image_path)
-                if result['success']:
-                    return {
-                        'success': True,
-                        'rank': result['character'],
-                        'confidence': result['confidence']
-                    }
-                else:
-                    return {'success': False, 'error': result['error']}
-        except Exception as e:
-            return {'success': False, 'error': str(e)}
-    
-    def _get_left_corner_image(self, image_path: str) -> Optional[str]:
-        """获取左上角图片路径"""
-        try:
-            image_file = Path(image_path)
-            left_pattern = f"{image_file.stem}_left.png"
-            left_file = image_file.parent / left_pattern
-            return str(left_file) if left_file.exists() else None
-        except:
-            return None
-    
     def _extract_position_from_filename(self, filename: str) -> str:
         """从文件名提取位置信息"""
         try:
+            # 文件名格式: camera_001_zhuang_1.png
             parts = filename.split('_')
             if len(parts) >= 4:
                 return f"{parts[2]}_{parts[3].split('.')[0]}"
@@ -422,12 +336,14 @@ class TuiSystem:
                 result = recognition_results[position]
                 positions[position] = {
                     'suit': result.get('suit', ''),
-                    'rank': result.get('rank', '')
+                    'rank': result.get('rank', ''),
+                    'confidence': result.get('confidence', 0.0)
                 }
             else:
                 positions[position] = {
                     'suit': '',
-                    'rank': ''
+                    'rank': '',
+                    'confidence': 0.0
                 }
         
         return {
@@ -436,17 +352,13 @@ class TuiSystem:
             'timestamp': datetime.now().isoformat()
         }
     
-    def _push_to_websocket(self, camera_id: str, formatted_results: Dict[str, Any]) -> Dict[str, Any]:
-        """推送到WebSocket服务器"""
+    def _push_to_recognition_manager(self, formatted_results: Dict[str, Any]) -> Dict[str, Any]:
+        """推送到识别结果管理器"""
         try:
-            # 确保WebSocket客户端已连接
-            if not self._ensure_websocket_connection():
-                return {'success': False, 'message': 'WebSocket连接失败'}
+            # 使用识别结果管理器
+            from src.core.recognition_manager import receive_recognition_data
             
-            from src.clients.websocket_client import push_recognition_result
-            
-            positions = formatted_results['positions']
-            result = push_recognition_result(camera_id, positions)
+            result = receive_recognition_data(formatted_results)
             
             if result['status'] == 'success':
                 return {'success': True, 'message': '推送成功'}
@@ -455,26 +367,6 @@ class TuiSystem:
                 
         except Exception as e:
             return {'success': False, 'message': str(e)}
-    
-    def _ensure_websocket_connection(self) -> bool:
-        """确保WebSocket连接"""
-        try:
-            if self.websocket_connected:
-                return True
-            
-            from src.clients.websocket_client import start_push_client, get_push_client_status
-            
-            # 尝试启动WebSocket客户端
-            result = start_push_client("ws://bjl_heguan_wss.yhyule666.com:8001", "python_client_tui")
-            
-            if result['status'] == 'success':
-                self.websocket_connected = True
-                return True
-            else:
-                return False
-                
-        except Exception as e:
-            return False
     
     def run_main_loop(self):
         """运行主循环"""
@@ -672,30 +564,6 @@ class TuiSystem:
             
         except Exception as e:
             print(f"❌ 显示统计信息失败: {e}")
-    
-    def cleanup(self):
-        """清理资源"""
-        try:
-            print("\n🔄 清理系统资源...")
-            
-            # 停止WebSocket客户端
-            if self.websocket_connected:
-                try:
-                    from src.clients.websocket_client import stop_push_client
-                    result = stop_push_client()
-                    if result['status'] == 'success':
-                        print("✅ WebSocket客户端已关闭")
-                except Exception as e:
-                    print(f"⚠️  关闭WebSocket客户端失败: {e}")
-            
-            # 显示最终统计
-            if self.stats['total_cycles'] > 0:
-                self.display_final_statistics()
-            
-            print("👋 实时识别推送系统已安全关闭")
-            
-        except Exception as e:
-            print(f"❌ 系统清理异常: {e}")
 
 def parse_arguments():
     """解析命令行参数"""
@@ -706,7 +574,7 @@ def parse_arguments():
 使用示例:
   python tui.py                    # 默认配置运行
   python tui.py --interval 5       # 设置循环间隔为5秒
-  python tui.py --no-websocket     # 禁用WebSocket推送
+  python tui.py --no-push          # 禁用推送功能
         """
     )
     
@@ -716,10 +584,8 @@ def parse_arguments():
                        help='摄像头切换延迟(秒) (默认: 1.0)')
     parser.add_argument('--max-retries', type=int, default=3,
                        help='最大重试次数 (默认: 3)')
-    parser.add_argument('--no-websocket', action='store_true',
-                       help='禁用WebSocket推送')
-    parser.add_argument('--no-save', action='store_true',
-                       help='不保存识别结果')
+    parser.add_argument('--no-push', action='store_true',
+                       help='禁用推送功能')
     
     return parser.parse_args()
 
@@ -736,8 +602,7 @@ def main():
             'recognition_interval': args.interval,
             'camera_switch_delay': args.camera_delay,
             'max_retry_times': args.max_retries,
-            'enable_websocket': not args.no_websocket,
-            'save_recognition_results': not args.no_save,
+            'enable_websocket': not args.no_push,
         })
         
         # 步骤1: 读取摄像头配置
@@ -749,8 +614,7 @@ def main():
         print(f"   循环间隔: {system.config['recognition_interval']} 秒")
         print(f"   切换延迟: {system.config['camera_switch_delay']} 秒")
         print(f"   最大重试: {system.config['max_retry_times']} 次")
-        print(f"   WebSocket推送: {'启用' if system.config['enable_websocket'] else '禁用'}")
-        print(f"   保存结果: {'启用' if system.config['save_recognition_results'] else '禁用'}")
+        print(f"   推送功能: {'启用' if system.config['enable_websocket'] else '禁用'}")
         
         # 设置信号处理
         def signal_handler(signum, frame):
@@ -765,8 +629,11 @@ def main():
         # 运行主循环
         system.run_main_loop()
         
-        # 清理资源
-        system.cleanup()
+        # 显示最终统计
+        if system.stats['total_cycles'] > 0:
+            system.display_final_statistics()
+        
+        print("👋 实时识别推送系统已关闭")
         
         return 0
         
