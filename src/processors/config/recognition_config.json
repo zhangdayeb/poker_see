@@ -1,0 +1,213 @@
+{
+  "system": {
+    "version": "1.0.0",
+    "description": "扑克牌识别系统配置",
+    "created_at": "2025-05-28T00:00:00",
+    "updated_at": "2025-05-28T00:00:00"
+  },
+  "recognition": {
+    "default_engine": "hybrid",
+    "fallback_engine": "yolo",
+    "auto_fallback": true,
+    "max_retry_times": 3,
+    "timeout_seconds": 30,
+    "engines": {
+      "yolo": {
+        "enabled": true,
+        "priority": 1,
+        "name": "YOLOv8 扑克牌识别",
+        "description": "基于YOLOv8深度学习模型的扑克牌识别",
+        "config": {
+          "model_path": "src/config/yolov8/best.pt",
+          "confidence_threshold": 0.5,
+          "nms_threshold": 0.4,
+          "device": "cpu",
+          "image_size": 640,
+          "max_detections": 1,
+          "agnostic_nms": false
+        },
+        "performance": {
+          "expected_accuracy": 0.85,
+          "expected_speed_ms": 200,
+          "memory_usage_mb": 500
+        }
+      },
+      "ocr": {
+        "enabled": true,
+        "priority": 2,
+        "name": "OCR 字符识别",
+        "description": "基于OCR的扑克牌点数识别",
+        "config": {
+          "provider": "paddle",
+          "fallback_provider": "easy",
+          "languages": ["en"],
+          "confidence_threshold": 0.3,
+          "use_gpu": false,
+          "use_angle_cls": false,
+          "det": true,
+          "rec": true,
+          "cls": false
+        },
+        "preprocessing": {
+          "crop_left_corner": true,
+          "corner_ratio": 0.25,
+          "enhance_contrast": true,
+          "binarization": false
+        },
+        "performance": {
+          "expected_accuracy": 0.75,
+          "expected_speed_ms": 500,
+          "memory_usage_mb": 200
+        }
+      },
+      "hybrid": {
+        "enabled": true,
+        "priority": 0,
+        "name": "混合识别引擎",
+        "description": "结合YOLO和OCR的混合识别方案",
+        "config": {
+          "primary_engine": "yolo",
+          "secondary_engine": "ocr",
+          "combination_strategy": "best_confidence",
+          "confidence_weights": {
+            "yolo": 0.7,
+            "ocr": 0.3
+          },
+          "parallel_execution": false,
+          "use_primary_for_suit": true,
+          "use_secondary_for_rank": true
+        },
+        "thresholds": {
+          "primary_min_confidence": 0.8,
+          "secondary_min_confidence": 0.3,
+          "hybrid_min_confidence": 0.5
+        },
+        "performance": {
+          "expected_accuracy": 0.90,
+          "expected_speed_ms": 700,
+          "memory_usage_mb": 700
+        }
+      },
+      "opencv": {
+        "enabled": false,
+        "priority": 3,
+        "name": "OpenCV 传统视觉",
+        "description": "基于OpenCV传统计算机视觉的识别方案",
+        "config": {
+          "template_matching": {
+            "enabled": true,
+            "templates_path": "src/config/templates/",
+            "threshold": 0.8,
+            "method": "TM_CCOEFF_NORMED"
+          },
+          "contour_detection": {
+            "enabled": true,
+            "min_area": 1000,
+            "max_area": 50000,
+            "aspect_ratio_range": [0.6, 0.8]
+          },
+          "color_analysis": {
+            "enabled": true,
+            "red_threshold": [0, 50, 50, 10, 255, 255],
+            "black_threshold": [0, 0, 0, 180, 255, 30]
+          },
+          "feature_matching": {
+            "enabled": false,
+            "detector": "ORB",
+            "matcher": "BFMatcher"
+          }
+        },
+        "performance": {
+          "expected_accuracy": 0.65,
+          "expected_speed_ms": 100,
+          "memory_usage_mb": 50
+        }
+      }
+    }
+  },
+  "preprocessing": {
+    "enabled": true,
+    "pipeline": [
+      "resize",
+      "enhance",
+      "noise_reduction"
+    ],
+    "resize": {
+      "enabled": false,
+      "target_width": 640,
+      "target_height": 480,
+      "keep_aspect_ratio": true,
+      "interpolation": "INTER_LINEAR"
+    },
+    "enhance": {
+      "enabled": true,
+      "brightness_factor": 1.1,
+      "contrast_factor": 1.2,
+      "saturation_factor": 1.0,
+      "sharpness_factor": 1.1,
+      "auto_adjust": true
+    },
+    "noise_reduction": {
+      "enabled": true,
+      "method": "gaussian_blur",
+      "kernel_size": 3,
+      "sigma": 0.5
+    },
+    "perspective_correction": {
+      "enabled": false,
+      "auto_detect": true,
+      "corner_detection_method": "harris"
+    }
+  },
+  "postprocessing": {
+    "enabled": true,
+    "result_filter": {
+      "min_confidence": 0.2,
+      "remove_duplicates": true,
+      "duplicate_threshold": 0.1
+    },
+    "result_validation": {
+      "enabled": true,
+      "valid_suits": ["hearts", "diamonds", "clubs", "spades"],
+      "valid_ranks": ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"],
+      "check_logical_consistency": true
+    },
+    "output_format": {
+      "standard_format": true,
+      "include_debug_info": false,
+      "include_timing_info": true,
+      "include_confidence_breakdown": true
+    }
+  },
+  "performance": {
+    "optimization": {
+      "enable_caching": true,
+      "cache_size_mb": 100,
+      "enable_gpu_acceleration": false,
+      "thread_pool_size": 4,
+      "batch_processing": false
+    },
+    "monitoring": {
+      "enable_metrics": true,
+      "log_performance": true,
+      "alert_slow_recognition": true,
+      "slow_recognition_threshold_ms": 2000
+    }
+  },
+  "debug": {
+    "enabled": false,
+    "save_debug_images": false,
+    "debug_image_path": "result/debug_images/",
+    "log_level": "INFO",
+    "detailed_error_messages": true,
+    "save_failed_cases": true
+  },
+  "logging": {
+    "enabled": true,
+    "log_file": "result/logs/recognition.log",
+    "log_level": "INFO",
+    "max_log_size_mb": 10,
+    "backup_count": 5,
+    "log_format": "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"
+  }
+}
