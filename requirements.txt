@@ -1,63 +1,132 @@
-# 扑克识别系统 - Python依赖包
-# Poker Recognition System Requirements
+# 扑克识别系统 2.0 依赖包
+# Poker Recognition System 2.0 Requirements
 
-# ==================== 核心AI/ML框架 ====================
-# YOLO目标检测模型 - 核心识别功能
-ultralytics>=8.0.0
+# ==================== 核心依赖 Core Dependencies ====================
+# 图像处理核心库
+opencv-python>=4.8.0
+Pillow>=10.0.0
+numpy>=1.24.0
 
-# 图像处理库
-opencv-python>=4.5.0
-Pillow>=8.0.0
+# JSON处理和数据结构
+python-dateutil>=2.8.2
+pathlib2>=2.3.7; python_version < '3.4'
 
-# 深度学习框架 (ultralytics的依赖)
-torch>=1.7.0
-torchvision>=0.8.0
+# ==================== 识别引擎 Recognition Engines ====================
+# YOLOv8 深度学习引擎 (可选)
+torch>=2.0.0; extra == 'yolo'
+torchvision>=0.15.0; extra == 'yolo'
+ultralytics>=8.0.0; extra == 'yolo'
 
-# ==================== Web服务器框架 ====================
-# HTTP服务器 (使用内置http.server，无需额外依赖)
+# OCR 识别引擎 (可选 - 选择其一)
+# PaddleOCR 引擎
+paddlepaddle>=2.5.0; extra == 'paddle'
+paddleocr>=2.7.0; extra == 'paddle'
 
-# WebSocket通信
-websockets>=10.0
+# EasyOCR 引擎
+easyocr>=1.7.0; extra == 'easy'
 
-# ==================== 数据处理 ====================
-# JSON处理 (内置json模块)
-# 时间处理 (内置datetime模块)
-# 路径操作 (内置pathlib模块)
+# ==================== 网络通信 Network Communication ====================
+# WebSocket 客户端
+websockets>=11.0.0
 
-# 网络请求 (用于API测试)
-requests>=2.25.0
+# HTTP 客户端 (内置 http.server，无需额外依赖)
+requests>=2.31.0
 
-# ==================== 数学计算 ====================
-# 数值计算
-numpy>=1.19.0
+# ==================== 系统工具 System Utilities ====================
+# 进程和线程管理
+psutil>=5.9.0
 
-# ==================== 系统工具 ====================
-# 用于多进程/多线程 (内置threading, subprocess模块)
+# 配置文件处理
+pyyaml>=6.0
 
-# ==================== 可选依赖 ====================
-# 如果需要更高级的图像处理
-# scipy>=1.6.0
+# 日志处理
+loguru>=0.7.0
 
-# 如果需要数据分析功能
-# pandas>=1.2.0
+# ==================== 开发和测试 Development & Testing ====================
+# 代码质量检查
+flake8>=6.0.0; extra == 'dev'
+black>=23.0.0; extra == 'dev'
+isort>=5.12.0; extra == 'dev'
 
-# 如果需要绘图功能
-# matplotlib>=3.3.0
+# 测试框架
+pytest>=7.4.0; extra == 'dev'
+pytest-cov>=4.1.0; extra == 'dev'
+pytest-asyncio>=0.21.0; extra == 'dev'
 
-# 如果需要进度条显示
-# tqdm>=4.60.0
+# 性能分析
+memory-profiler>=0.61.0; extra == 'dev'
+line-profiler>=4.1.0; extra == 'dev'
 
-# ==================== 开发调试工具 ====================
-# 代码格式化工具 (可选)
-# black>=21.0.0
-# flake8>=3.8.0
+# ==================== 可选增强功能 Optional Enhancements ====================
+# 数据科学和可视化
+matplotlib>=3.7.0; extra == 'viz'
+seaborn>=0.12.0; extra == 'viz'
+plotly>=5.15.0; extra == 'viz'
 
-# ==================== 版本兼容性说明 ====================
-# Python 版本要求: >=3.7
-# 推荐Python版本: >=3.8
+# 数据处理
+pandas>=2.0.0; extra == 'data'
+scikit-learn>=1.3.0; extra == 'data'
 
-# ==================== 安装顺序建议 ====================
-# 1. 先安装基础依赖: pip install numpy pillow requests
-# 2. 再安装深度学习框架: pip install torch torchvision
-# 3. 最后安装YOLO: pip install ultralytics
-# 4. 安装其他依赖: pip install opencv-python websockets
+# GPU 加速 (CUDA)
+torch>=2.0.0+cu118; extra == 'cuda'
+torchvision>=0.15.0+cu118; extra == 'cuda'
+
+# ==================== 轻量级安装 Minimal Installation ====================
+# 仅核心功能，不含深度学习
+# pip install -r requirements.txt --no-deps
+# 然后手动安装: opencv-python pillow numpy websockets
+
+# ==================== 生产环境 Production ====================
+# 生产环境推荐固定版本
+gunicorn>=21.2.0; extra == 'prod'
+supervisor>=4.2.0; extra == 'prod'
+
+# ==================== 平台特定 Platform Specific ====================
+# Windows 特定
+pywin32>=306; sys_platform == "win32"
+winsound>=1.0; sys_platform == "win32"
+
+# Linux 特定  
+python-xlib>=0.33; sys_platform == "linux"
+
+# macOS 特定
+pyobjc>=9.2; sys_platform == "darwin"
+
+# ==================== 安装说明 Installation Instructions ====================
+# 
+# 1. 基础安装 (仅核心功能):
+#    pip install opencv-python pillow numpy websockets requests
+#
+# 2. 完整安装 (包含所有识别引擎):
+#    pip install -r requirements.txt[yolo,paddle,easy]
+#
+# 3. 开发环境安装:
+#    pip install -r requirements.txt[dev,yolo,paddle]
+#
+# 4. 生产环境安装:
+#    pip install -r requirements.txt[prod,yolo,paddle]
+#
+# 5. CUDA GPU 加速安装:
+#    pip install -r requirements.txt[cuda,paddle]
+#
+# 6. 数据分析和可视化:
+#    pip install -r requirements.txt[viz,data]
+#
+# ==================== 版本兼容性 Version Compatibility ====================
+# 
+# Python 版本要求: >= 3.8
+# 推荐 Python 版本: 3.9, 3.10, 3.11
+# 
+# 操作系统支持:
+# - Windows 10/11 (x64)
+# - Ubuntu 18.04+ / Debian 10+
+# - macOS 10.15+ (Intel/Apple Silicon)
+# - CentOS 7+ / RHEL 7+
+#
+# ==================== 性能优化建议 Performance Optimization ====================
+#
+# 1. 仅安装需要的识别引擎，避免不必要的依赖
+# 2. 生产环境使用固定版本号
+# 3. 考虑使用虚拟环境隔离依赖
+# 4. GPU 环境安装对应的 CUDA 版本
+# 5. 定期更新依赖包以获得性能改进和安全修复
