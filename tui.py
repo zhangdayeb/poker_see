@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-实时识别推送系统 - tui.py (混合识别器版本)
+实时识别推送系统 - tui.py (数据库版本)
 业务逻辑:
 1. 读取摄像头配置
 2. 轮询拍照
 3. 轮询裁剪
 4. 轮询混合识别 (YOLO + OCR + OpenCV)
 5. 结果合并优化
-6. 轮询推送
+6. 写入远程数据库
 """
 
 import sys
@@ -17,6 +17,7 @@ import json
 import signal
 import argparse
 import threading
+import pymysql
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, List, Optional
@@ -35,8 +36,8 @@ def setup_project_paths():
 
 PROJECT_ROOT = setup_project_paths()
 
-class EnhancedTuiSystem:
-    """增强版实时识别推送系统 - 使用混合识别器"""
+class DatabaseTuiSystem:
+    """数据库版实时识别推送系统"""
     
     def __init__(self):
         """初始化系统"""
@@ -48,9 +49,23 @@ class EnhancedTuiSystem:
             'camera_switch_delay': 1,   # 摄像头切换延迟(秒)
             'max_retry_times': 3,       # 最大重试次数
             'retry_delay': 2,           # 重试延迟(秒)
-            'enable_websocket': True,   # 启用WebSocket推送
+            'enable_database': True,    # 启用数据库写入
             'save_recognition_results': True,  # 保存识别结果
             'enable_result_merging': True,  # 启用结果合并
+        }
+        
+        # 数据库配置
+        self.db_config = {
+            'host': '134.122.197.44',
+            'user': 'tuxiang',
+            'password': 'JjEAhCEArRAHYcD8',
+            'database': 'tuxiang',
+            'port': 3306,
+            'charset': 'utf8',
+            'connect_timeout': 10,
+            'read_timeout': 10,
+            'write_timeout': 10,
+            'autocommit': True
         }
         
         # 混合识别器配置
@@ -91,40 +106,110 @@ class EnhancedTuiSystem:
             'include_quality_metrics': True
         }
         
+        # 位置映射配置
+        self.position_mapping = {
+            'zhuang_1': 't1_pl0',
+            'zhuang_2': 't1_pl1',
+            'zhuang_3': 't1_pl2',
+            'xian_1': 't1_pr0',
+            'xian_2': 't1_pr1',
+            'xian_3': 't1_pr2'
+        }
+        
+        # 点数转换映射
+        self.rank_mapping = {
+            '': 0, 'A': 1, '2': 2, '3': 3, '4': 4, '5': 5,
+            '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
+            'J': 11, 'Q': 12, 'K': 13
+        }
+        
+        # 花色转换映射
+        self.suit_mapping = {
+            '': '0',
+            'hearts': 'r',    # 红桃
+            'diamonds': 'f',  # 方块
+            'clubs': 'm',     # 梅花
+            'spades': 'h'     # 黑桃
+        }
+        
         # 摄像头配置
         self.enabled_cameras = []
         self.current_camera_index = 0
         
-        # WebSocket客户端
-        self.websocket_client = None
-        self.websocket_connected = False
+        # 数据库连接池
+        self.db_connection = None
         
         # 统计信息
         self.stats = {
             'start_time': datetime.now(),
             'total_cycles': 0,
-            'camera_stats': {},  # 每个摄像头的统计
-            'last_results': {},  # 最后一次识别结果
+            'camera_stats': {},
+            'last_results': {},
+            'database_stats': {
+                'total_writes': 0,
+                'successful_writes': 0,
+                'failed_writes': 0,
+                'last_write_time': None,
+                'connection_errors': 0
+            },
             'recognition_method_stats': {
-                'yolo_complete': 0,      # YOLO完整识别
-                'hybrid_combined': 0,    # 混合组合识别
-                'ocr_only': 0,          # 仅OCR识别
-                'opencv_only': 0,       # 仅OpenCV识别
-                'failed': 0             # 识别失败
+                'yolo_complete': 0,
+                'hybrid_combined': 0,
+                'ocr_only': 0,
+                'opencv_only': 0,
+                'failed': 0
             },
             'quality_stats': {
-                'excellent': 0,    # 优秀
-                'good': 0,         # 良好
-                'average': 0,      # 一般
-                'poor': 0,         # 较差
-                'very_poor': 0     # 很差
+                'excellent': 0,
+                'good': 0,
+                'average': 0,
+                'poor': 0,
+                'very_poor': 0
             }
         }
         
         # 显示状态
         self.display_lock = threading.Lock()
         
-        print("🚀 增强版实时识别推送系统初始化完成 (使用混合识别器)")
+        print("🚀 数据库版实时识别推送系统初始化完成")
+    
+    def _init_database_connection(self) -> bool:
+        """初始化数据库连接"""
+        try:
+            print("\n🗄️  初始化数据库连接...")
+            print(f"   服务器: {self.db_config['host']}:{self.db_config['port']}")
+            print(f"   数据库: {self.db_config['database']}")
+            print(f"   用户: {self.db_config['user']}")
+            
+            self.db_connection = pymysql.connect(**self.db_config)
+            
+            # 测试连接
+            with self.db_connection.cursor() as cursor:
+                cursor.execute("SELECT COUNT(*) FROM tu_bjl_result")
+                count = cursor.fetchone()[0]
+                print(f"✅ 数据库连接成功，表中有 {count} 条记录")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ 数据库连接失败: {e}")
+            self.stats['database_stats']['connection_errors'] += 1
+            return False
+    
+    def _ensure_database_connection(self) -> bool:
+        """确保数据库连接有效"""
+        try:
+            if self.db_connection is None:
+                return self._init_database_connection()
+            
+            # 测试连接是否有效
+            self.db_connection.ping(reconnect=True)
+            return True
+            
+        except Exception as e:
+            print(f"⚠️  数据库连接断开，尝试重连: {e}")
+            self.stats['database_stats']['connection_errors'] += 1
+            return self._init_database_connection()
     
     def step1_load_camera_config(self) -> bool:
         """步骤1: 读取摄像头配置"""
@@ -160,10 +245,10 @@ class EnhancedTuiSystem:
                     'total_attempts': 0,
                     'successful_photos': 0,
                     'successful_recognitions': 0,
-                    'successful_pushes': 0,
+                    'successful_writes': 0,
                     'last_photo_time': None,
                     'last_recognition_time': None,
-                    'last_push_time': None,
+                    'last_write_time': None,
                     'last_result': None,
                     'recognition_method_counts': {
                         'yolo_complete': 0,
@@ -339,7 +424,7 @@ class EnhancedTuiSystem:
             from src.processors.poker_result_merger import merge_poker_recognition_results
             
             metadata = {
-                'system_mode': 'realtime_push',
+                'system_mode': 'realtime_database',
                 'fusion_strategy': self.recognition_config['fusion_strategy'],
                 'timestamp': datetime.now().isoformat()
             }
@@ -357,9 +442,9 @@ class EnhancedTuiSystem:
             if merge_result.get('success') and 'quality' in merge_result:
                 self._update_quality_stats(camera_id, merge_result['quality'])
             
-            # 转换为推送格式
+            # 转换为数据库格式
             if merge_result.get('success'):
-                formatted_result = self._convert_merge_result_to_push_format(camera_id, merge_result)
+                formatted_result = self._convert_merge_result_to_database_format(camera_id, merge_result)
                 formatted_result['merge_duration'] = duration
                 return formatted_result
             else:
@@ -376,36 +461,147 @@ class EnhancedTuiSystem:
                 'duration': 0
             }
     
-    def step6_push_results(self, camera_id: str, formatted_results: Dict[str, Any]) -> Dict[str, Any]:
-        """步骤6: 推送识别结果"""
+    def step6_write_to_database(self, camera_id: str, formatted_results: Dict[str, Any]) -> Dict[str, Any]:
+        """步骤6: 写入远程数据库"""
         try:
-            if not self.config['enable_websocket']:
-                return {'success': True, 'message': 'WebSocket推送已禁用', 'duration': 0}
+            if not self.config['enable_database']:
+                return {'success': True, 'message': '数据库写入已禁用', 'duration': 0}
             
             start_time = time.time()
             
-            # 推送到识别结果管理器
-            push_result = self._push_to_recognition_manager(formatted_results)
+            # 确保数据库连接有效
+            if not self._ensure_database_connection():
+                return {
+                    'success': False,
+                    'message': '数据库连接失败',
+                    'duration': time.time() - start_time
+                }
+            
+            # 显示识别结果
+            self._display_recognition_results_table(formatted_results)
+            
+            # 写入数据库
+            write_result = self._write_results_to_database(formatted_results)
             
             duration = time.time() - start_time
             
             # 更新统计
-            if push_result['success']:
-                self.stats['camera_stats'][camera_id]['successful_pushes'] += 1
-                self.stats['camera_stats'][camera_id]['last_push_time'] = datetime.now().strftime('%H:%M:%S')
+            self.stats['database_stats']['total_writes'] += 1
+            if write_result['success']:
+                self.stats['database_stats']['successful_writes'] += 1
+                self.stats['database_stats']['last_write_time'] = datetime.now().strftime('%H:%M:%S')
+                self.stats['camera_stats'][camera_id]['successful_writes'] += 1
+                self.stats['camera_stats'][camera_id]['last_write_time'] = datetime.now().strftime('%H:%M:%S')
+            else:
+                self.stats['database_stats']['failed_writes'] += 1
             
             return {
-                'success': push_result['success'],
-                'message': push_result['message'],
-                'duration': duration
+                'success': write_result['success'],
+                'message': write_result['message'],
+                'duration': duration,
+                'updated_count': write_result.get('updated_count', 0)
             }
             
         except Exception as e:
+            self.stats['database_stats']['failed_writes'] += 1
             return {
                 'success': False,
                 'message': str(e),
                 'duration': 0
             }
+    
+    def _write_results_to_database(self, formatted_results: Dict[str, Any]) -> Dict[str, Any]:
+        """执行数据库写入操作"""
+        try:
+            positions = formatted_results.get('positions', {})
+            updated_count = 0
+            
+            with self.db_connection.cursor() as cursor:
+                for system_position, result_data in positions.items():
+                    if system_position in self.position_mapping:
+                        db_position = self.position_mapping[system_position]
+                        
+                        # 转换数据格式
+                        rank_value = self.rank_mapping.get(result_data.get('rank', ''), 0)
+                        suit_value = self.suit_mapping.get(result_data.get('suit', ''), '0')
+                        
+                        # 构建JSON字符串
+                        result_json = json.dumps({
+                            "rank": str(rank_value),
+                            "suit": suit_value
+                        })
+                        
+                        # 执行更新
+                        sql = "UPDATE tu_bjl_result SET result = %s WHERE position = %s"
+                        cursor.execute(sql, (result_json, db_position))
+                        
+                        if cursor.rowcount > 0:
+                            updated_count += 1
+            
+            # 提交事务
+            self.db_connection.commit()
+            
+            return {
+                'success': True,
+                'message': f'成功更新 {updated_count} 条记录',
+                'updated_count': updated_count
+            }
+            
+        except Exception as e:
+            # 回滚事务
+            if self.db_connection:
+                self.db_connection.rollback()
+            
+            return {
+                'success': False,
+                'message': f'数据库写入失败: {str(e)}',
+                'updated_count': 0
+            }
+    
+    def _display_recognition_results_table(self, formatted_results: Dict[str, Any]):
+        """以表格形式显示识别结果"""
+        with self.display_lock:
+            positions = formatted_results.get('positions', {})
+            
+            print("      📊 识别结果展示:")
+            print("      ┌─────────┬─────────┬────────┬─────────┬──────────┐")
+            print("      │ 位置    │ 系统结果│ 数据库位置│ 转换结果│ 置信度   │")
+            print("      ├─────────┼─────────┼────────┼─────────┼──────────┤")
+            
+            position_names = {
+                'zhuang_1': '庄1', 'zhuang_2': '庄2', 'zhuang_3': '庄3',
+                'xian_1': '闲1', 'xian_2': '闲2', 'xian_3': '闲3'
+            }
+            
+            for position in ['zhuang_1', 'zhuang_2', 'zhuang_3', 'xian_1', 'xian_2', 'xian_3']:
+                result_data = positions.get(position, {})
+                
+                # 系统结果
+                suit = result_data.get('suit', '')
+                rank = result_data.get('rank', '')
+                confidence = result_data.get('confidence', 0.0)
+                
+                if suit and rank:
+                    suit_symbol = {'hearts': '♥️', 'diamonds': '♦️', 'clubs': '♣️', 'spades': '♠️'}.get(suit, '')
+                    system_result = f"{suit_symbol}{rank}"
+                else:
+                    system_result = "未识别"
+                
+                # 转换结果
+                rank_value = self.rank_mapping.get(rank, 0)
+                suit_value = self.suit_mapping.get(suit, '0')
+                converted_result = f"{suit_value},{rank_value}"
+                
+                # 数据库位置
+                db_position = self.position_mapping.get(position, '')
+                
+                # 格式化显示
+                pos_name = position_names.get(position, position)
+                confidence_str = f"{confidence*100:.1f}%" if confidence > 0 else "0.0%"
+                
+                print(f"      │ {pos_name:<7} │ {system_result:<7} │ {db_position:<6} │ {converted_result:<7} │ {confidence_str:<8} │")
+            
+            print("      └─────────┴─────────┴────────┴─────────┴──────────┘")
     
     def _create_image_mapping(self, main_files: List[str], left_files: List[str]) -> Dict[str, str]:
         """创建主图片和左上角图片的对应关系"""
@@ -525,8 +721,8 @@ class EnhancedTuiSystem:
             'merge_enabled': False
         }
     
-    def _convert_merge_result_to_push_format(self, camera_id: str, merge_result: Dict[str, Any]) -> Dict[str, Any]:
-        """将合并结果转换为推送格式"""
+    def _convert_merge_result_to_database_format(self, camera_id: str, merge_result: Dict[str, Any]) -> Dict[str, Any]:
+        """将合并结果转换为数据库格式"""
         positions = {}
         
         # 从合并结果提取位置数据
@@ -559,31 +755,16 @@ class EnhancedTuiSystem:
             'warnings': merge_result.get('warnings', [])
         }
     
-    def _push_to_recognition_manager(self, formatted_results: Dict[str, Any]) -> Dict[str, Any]:
-        """推送到识别结果管理器"""
-        try:
-            # 使用识别结果管理器
-            from src.core.recognition_manager import receive_recognition_data
-            
-            result = receive_recognition_data(formatted_results)
-            
-            if result['status'] == 'success':
-                return {'success': True, 'message': '推送成功'}
-            else:
-                return {'success': False, 'message': result.get('message', '推送失败')}
-                
-        except Exception as e:
-            return {'success': False, 'message': str(e)}
-    
     def run_main_loop(self):
         """运行主循环"""
         try:
-            print(f"\n🔄 开始增强版实时识别推送循环")
+            print(f"\n🔄 开始数据库版实时识别推送循环")
             print(f"   识别间隔: {self.config['recognition_interval']} 秒")
             print(f"   切换延迟: {self.config['camera_switch_delay']} 秒")
             print(f"   启用摄像头: {len(self.enabled_cameras)} 个")
             print(f"   融合策略: {self.recognition_config['fusion_strategy']}")
             print(f"   结果合并: {'启用' if self.config['enable_result_merging'] else '禁用'}")
+            print(f"   数据库写入: {'启用' if self.config['enable_database'] else '禁用'}")
             print("=" * 60)
             
             while not self.shutdown_requested:
@@ -627,6 +808,11 @@ class EnhancedTuiSystem:
         except Exception as e:
             print(f"\n❌ 主循环异常: {e}")
             self.shutdown_requested = True
+        finally:
+            # 关闭数据库连接
+            if self.db_connection:
+                self.db_connection.close()
+                print("🗄️  数据库连接已关闭")
     
     def _process_single_camera_workflow(self, camera_id: str) -> bool:
         """处理单个摄像头的完整工作流程"""
@@ -676,9 +862,11 @@ class EnhancedTuiSystem:
             # 保存最新结果
             self.stats['last_results'][camera_id] = merge_result
             
-            # 步骤6: 推送
-            push_result = self.step6_push_results(camera_id, merge_result)
-            self._display_step_result("推送", push_result['success'], push_result['message'], push_result['duration'])
+            # 步骤6: 写入数据库
+            db_result = self.step6_write_to_database(camera_id, merge_result)
+            self._display_step_result("数据库写入", db_result['success'], 
+                                    f"{db_result['message']} ({db_result.get('updated_count', 0)}条)", 
+                                    db_result['duration'])
             
             # 显示总耗时
             total_duration = time.time() - workflow_start_time
@@ -800,6 +988,11 @@ class EnhancedTuiSystem:
         with self.display_lock:
             print(f"\n📊 本轮汇总: 耗时 {cycle_duration:.2f}秒")
             
+            # 显示数据库统计
+            db_stats = self.stats['database_stats']
+            db_success_rate = (db_stats['successful_writes'] / db_stats['total_writes'] * 100) if db_stats['total_writes'] > 0 else 0
+            print(f"   🗄️  数据库: 总写入{db_stats['total_writes']} 成功{db_stats['successful_writes']} 失败{db_stats['failed_writes']} 成功率{db_success_rate:.1f}% 连接错误{db_stats['connection_errors']}")
+            
             # 显示各摄像头状态
             for camera_id, stats in self.stats['camera_stats'].items():
                 camera_name = next((c['name'] for c in self.enabled_cameras if c['id'] == camera_id), camera_id)
@@ -813,7 +1006,7 @@ class EnhancedTuiSystem:
                 method_str = f"Y{method_counts['yolo_complete']}H{method_counts['hybrid_combined']}O{method_counts['ocr_only']}C{method_counts['opencv_only']}"
                 
                 print(f"   {success_icon} {camera_name}: 拍照{stats['successful_photos']}/{stats['total_attempts']} "
-                      f"识别{stats['successful_recognitions']} 推送{stats['successful_pushes']} "
+                      f"识别{stats['successful_recognitions']} 写入{stats['successful_writes']} "
                       f"质量{avg_quality:.2f} 方法[{method_str}] 最后:{last_time}")
     
     def _display_waiting(self, wait_time: float):
@@ -831,6 +1024,17 @@ class EnhancedTuiSystem:
             total_time = datetime.now() - self.stats['start_time']
             print(f"⏰ 总运行时间: {str(total_time).split('.')[0]}")
             print(f"🔄 总循环数: {self.stats['total_cycles']}")
+            
+            # 显示数据库统计
+            db_stats = self.stats['database_stats']
+            if db_stats['total_writes'] > 0:
+                db_success_rate = (db_stats['successful_writes'] / db_stats['total_writes']) * 100
+                print(f"\n🗄️  数据库统计:")
+                print(f"  总写入次数: {db_stats['total_writes']}")
+                print(f"  成功写入: {db_stats['successful_writes']} ({db_success_rate:.1f}%)")
+                print(f"  失败写入: {db_stats['failed_writes']}")
+                print(f"  连接错误: {db_stats['connection_errors']}")
+                print(f"  最后写入: {db_stats['last_write_time'] or '无'}")
             
             # 显示识别方法统计
             method_stats = self.stats['recognition_method_stats']
@@ -877,7 +1081,7 @@ class EnhancedTuiSystem:
                 print(f"   {camera_name} (ID: {camera_id}):")
                 print(f"     拍照: {stats['successful_photos']}/{stats['total_attempts']} ({photo_rate:.1f}%)")
                 print(f"     识别: {stats['successful_recognitions']} 次成功")
-                print(f"     推送: {stats['successful_pushes']} 次成功")
+                print(f"     写入: {stats['successful_writes']} 次成功")
                 print(f"     平均质量: {stats['average_quality_score']:.3f}")
                 
                 # 识别方法分布
@@ -891,16 +1095,17 @@ class EnhancedTuiSystem:
         except Exception as e:
             print(f"❌ 显示统计信息失败: {e}")
 
+
 def parse_arguments():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(
-        description='增强版实时识别推送系统 (混合识别器)',
+        description='数据库版实时识别推送系统',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:
   python tui.py                           # 默认配置运行
   python tui.py --interval 5              # 设置循环间隔为5秒
-  python tui.py --no-push                 # 禁用推送功能
+  python tui.py --no-db                   # 禁用数据库写入功能
   python tui.py --strategy voting         # 使用投票融合策略
   python tui.py --no-merge                # 禁用结果合并
   python tui.py --no-yolo                 # 禁用YOLO识别
@@ -914,8 +1119,8 @@ def parse_arguments():
                        help='摄像头切换延迟(秒) (默认: 1.0)')
     parser.add_argument('--max-retries', type=int, default=3,
                        help='最大重试次数 (默认: 3)')
-    parser.add_argument('--no-push', action='store_true',
-                       help='禁用推送功能')
+    parser.add_argument('--no-db', action='store_true',
+                       help='禁用数据库写入功能')
     parser.add_argument('--no-merge', action='store_true',
                        help='禁用结果合并')
     parser.add_argument('--strategy', choices=['weighted', 'voting', 'priority'], 
@@ -931,20 +1136,21 @@ def parse_arguments():
     
     return parser.parse_args()
 
+
 def main():
     """主函数"""
     try:
         args = parse_arguments()
         
-        # 创建增强版系统实例
-        system = EnhancedTuiSystem()
+        # 创建数据库版系统实例
+        system = DatabaseTuiSystem()
         
         # 更新系统配置
         system.config.update({
             'recognition_interval': args.interval,
             'camera_switch_delay': args.camera_delay,
             'max_retry_times': args.max_retries,
-            'enable_websocket': not args.no_push,
+            'enable_database': not args.no_db,
             'enable_result_merging': not args.no_merge,
         })
         
@@ -961,12 +1167,18 @@ def main():
         if not system.step1_load_camera_config():
             return 1
         
+        # 初始化数据库连接
+        if system.config['enable_database']:
+            if not system._init_database_connection():
+                print("❌ 数据库连接初始化失败，程序退出")
+                return 1
+        
         # 显示系统配置
-        print(f"\n🚀 增强版系统配置:")
+        print(f"\n🚀 数据库版系统配置:")
         print(f"   循环间隔: {system.config['recognition_interval']} 秒")
         print(f"   切换延迟: {system.config['camera_switch_delay']} 秒")
         print(f"   最大重试: {system.config['max_retry_times']} 次")
-        print(f"   推送功能: {'启用' if system.config['enable_websocket'] else '禁用'}")
+        print(f"   数据库写入: {'启用' if system.config['enable_database'] else '禁用'}")
         print(f"   结果合并: {'启用' if system.config['enable_result_merging'] else '禁用'}")
         print(f"   融合策略: {system.recognition_config['fusion_strategy']}")
         print(f"   YOLO识别: {'启用' if system.recognition_config['yolo_enabled'] else '禁用'}")
@@ -991,13 +1203,14 @@ def main():
         if system.stats['total_cycles'] > 0:
             system.display_final_statistics()
         
-        print("👋 增强版实时识别推送系统已关闭")
+        print("👋 数据库版实时识别推送系统已关闭")
         
         return 0
         
     except Exception as e:
         print(f"❌ 程序异常: {e}")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())
