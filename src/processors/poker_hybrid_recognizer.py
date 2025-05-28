@@ -642,47 +642,258 @@ def get_hybrid_recognition_capabilities() -> Dict[str, Any]:
     """获取混合识别能力信息"""
     return hybrid_recognizer.get_recognition_capabilities()
 
-if __name__ == "__main__":
-    # 测试混合识别器
-    print("🧪 测试混合扑克牌识别器")
+def test_single_card_from_command_line():
+    """命令行单卡测试功能"""
+    import argparse
+    import sys
+    
+    parser = argparse.ArgumentParser(
+        description='扑克牌混合识别器 - 单卡测试',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+使用示例:
+  python poker_hybrid_recognizer.py --main image.png --left left.png
+  python poker_hybrid_recognizer.py --main image.png --left left.png --strategy voting
+  python poker_hybrid_recognizer.py --main image.png --left left.png --debug
+  python poker_hybrid_recognizer.py --main image.png --left left.png --no-yolo
+        """
+    )
+    
+    parser.add_argument('--main', '--main-image', dest='main_image', required=True,
+                       help='完整扑克牌图片路径')
+    parser.add_argument('--left', '--left-image', dest='left_image', required=True,
+                       help='左上角图片路径')
+    parser.add_argument('--strategy', choices=['weighted', 'voting', 'priority'], 
+                       default='weighted', help='融合策略 (默认: weighted)')
+    parser.add_argument('--debug', action='store_true',
+                       help='启用调试模式')
+    parser.add_argument('--no-yolo', action='store_true',
+                       help='禁用YOLO识别')
+    parser.add_argument('--no-ocr', action='store_true',
+                       help='禁用OCR识别')
+    parser.add_argument('--no-opencv', action='store_true',
+                       help='禁用OpenCV花色识别')
+    parser.add_argument('--repeat', type=int, default=1,
+                       help='重复测试次数 (默认: 1)')
+    
+    args = parser.parse_args()
+    
+    # 验证文件存在性
+    if not os.path.exists(args.main_image):
+        print(f"❌ 主图片文件不存在: {args.main_image}")
+        return 1
+    
+    if not os.path.exists(args.left_image):
+        print(f"❌ 左上角图片文件不存在: {args.left_image}")
+        return 1
+    
+    # 配置识别器
+    config = {
+        'fusion_strategy': args.strategy,
+        'debug_mode': args.debug,
+        'yolo_enabled': not args.no_yolo,
+        'ocr_enabled': not args.no_ocr,
+        'opencv_suit_enabled': not args.no_opencv,
+        'min_confidence_for_result': 0.2,  # 降低阈值以便测试
+        'enable_result_validation': True
+    }
+    
+    print("🎯 扑克牌混合识别器 - 单卡测试")
+    print("=" * 60)
+    print(f"主图片: {args.main_image}")
+    print(f"左上角: {args.left_image}")
+    print(f"融合策略: {args.strategy}")
+    print(f"调试模式: {'启用' if args.debug else '禁用'}")
+    print(f"YOLO: {'启用' if not args.no_yolo else '禁用'}")
+    print(f"OCR: {'启用' if not args.no_ocr else '禁用'}")
+    print(f"OpenCV: {'启用' if not args.no_opencv else '禁用'}")
+    print(f"测试次数: {args.repeat}")
     print("=" * 60)
     
-    # 显示可用能力
+    # 显示识别能力
     capabilities = get_hybrid_recognition_capabilities()
-    print("🔍 识别能力:")
+    print("\n🔍 当前识别能力:")
     for method, available in capabilities['available_methods'].items():
         status = "✅ 可用" if available else "❌ 不可用"
-        print(f"   {method}: {status}")
+        method_name = {
+            'yolo': 'YOLO检测器',
+            'ocr_easy': 'EasyOCR',
+            'ocr_paddle': 'PaddleOCR',
+            'opencv_suit': 'OpenCV花色识别'
+        }.get(method, method)
+        print(f"   {method_name}: {status}")
     
-    # 测试识别
-    test_images = [
-        ("src/image/cut/camera_001_zhuang_1.png", "src/image/cut/camera_001_zhuang_1_left.png"),
-        ("src/image/cut/camera_001_xian_1.png", "src/image/cut/camera_001_xian_1_left.png")
-    ]
+    # 执行测试
+    results = []
+    total_duration = 0
     
-    for main_image, left_image in test_images:
-        if os.path.exists(main_image):
-            print(f"\n📸 测试图片: {main_image}")
+    for i in range(args.repeat):
+        if args.repeat > 1:
+            print(f"\n🔄 第 {i+1}/{args.repeat} 次测试:")
             print("-" * 40)
-            
-            result = recognize_poker_card_hybrid(main_image, left_image)
-            
-            if result['success']:
-                print("✅ 混合识别成功!")
-                print(f"   结果: {result['display_name']}")
-                print(f"   花色: {result['suit_name']} ({result['suit_symbol']})")
-                print(f"   点数: {result['rank']}")
-                print(f"   置信度: {result['confidence']:.3f}")
-                print(f"   耗时: {result['recognition_duration']:.3f}秒")
-                print(f"   使用方法: {result['hybrid_info']['used_methods']}")
-                
-                if result.get('validation_warnings'):
-                    print(f"   验证警告: {result['validation_warnings']}")
-            else:
-                print("❌ 混合识别失败!")
-                print(f"   错误: {result.get('error', '未知错误')}")
-                print(f"   耗时: {result.get('recognition_duration', 0):.3f}秒")
         else:
-            print(f"\n❌ 测试图片不存在: {main_image}")
+            print(f"\n🚀 开始识别:")
+            print("-" * 40)
+        
+        # 执行识别
+        start_time = time.time()
+        result = recognize_poker_card_hybrid(args.main_image, args.left_image, config)
+        test_duration = time.time() - start_time
+        total_duration += test_duration
+        
+        results.append(result)
+        
+        # 显示详细结果
+        if result['success']:
+            print("✅ 混合识别成功!")
+            print(f"   🎴 识别结果: {result['display_name']}")
+            print(f"   🃏 花色: {result['suit_name']} ({result['suit_symbol']})")
+            print(f"   🔢 点数: {result['rank']}")
+            print(f"   📊 置信度: {result['confidence']:.4f}")
+            print(f"   ⏱️  识别耗时: {result['recognition_duration']:.4f}秒")
+            print(f"   🧠 使用方法: {', '.join(result['hybrid_info']['used_methods'])}")
+            print(f"   🔄 融合策略: {result['hybrid_info']['fusion_strategy']}")
+            
+            # 显示验证信息
+            if result.get('validation_passed') is False:
+                print(f"   ⚠️  验证状态: 未通过")
+            elif result.get('validation_warnings'):
+                print(f"   ⚠️  验证警告: {', '.join(result['validation_warnings'])}")
+            else:
+                print(f"   ✅ 验证状态: 通过")
+            
+            # 调试模式显示详细信息
+            if args.debug and 'hybrid_info' in result and 'method_results' in result['hybrid_info']:
+                print(f"\n   🔧 调试信息:")
+                method_results = result['hybrid_info']['method_results']
+                for method, method_result in method_results.items():
+                    if method_result.get('success'):
+                        confidence = method_result.get('confidence', 0)
+                        print(f"      {method}: ✅ {confidence:.4f}")
+                    else:
+                        error = method_result.get('error', '失败')
+                        print(f"      {method}: ❌ {error}")
+        else:
+            print("❌ 混合识别失败!")
+            print(f"   🚫 错误信息: {result.get('error', '未知错误')}")
+            print(f"   ⏱️  处理耗时: {result.get('recognition_duration', 0):.4f}秒")
+            
+            # 显示可用的方法结果
+            if 'hybrid_info' in result and 'method_results' in result['hybrid_info']:
+                method_results = result['hybrid_info']['method_results']
+                print(f"   📝 各方法状态:")
+                for method, method_result in method_results.items():
+                    if method_result.get('success'):
+                        confidence = method_result.get('confidence', 0)
+                        display = method_result.get('display_name', '')
+                        print(f"      {method}: ✅ {display} ({confidence:.4f})")
+                    else:
+                        error = method_result.get('error', '失败')
+                        print(f"      {method}: ❌ {error}")
+        
+        print(f"   ✨ 本次总耗时: {test_duration:.4f}秒")
     
-    print("\n✅ 混合识别器测试完成")
+    # 显示汇总统计
+    if args.repeat > 1:
+        print(f"\n📈 测试汇总统计 ({args.repeat} 次):")
+        print("-" * 50)
+        
+        successful_tests = len([r for r in results if r['success']])
+        success_rate = (successful_tests / len(results)) * 100
+        avg_duration = total_duration / len(results)
+        
+        print(f"   成功次数: {successful_tests}/{len(results)}")
+        print(f"   成功率: {success_rate:.1f}%")
+        print(f"   平均耗时: {avg_duration:.4f}秒")
+        print(f"   总耗时: {total_duration:.4f}秒")
+        
+        if successful_tests > 0:
+            # 置信度统计
+            confidences = [r['confidence'] for r in results if r['success']]
+            avg_confidence = sum(confidences) / len(confidences)
+            min_confidence = min(confidences)
+            max_confidence = max(confidences)
+            
+            print(f"   平均置信度: {avg_confidence:.4f}")
+            print(f"   置信度范围: {min_confidence:.4f} - {max_confidence:.4f}")
+            
+            # 识别方法统计
+            method_stats = {}
+            for result in results:
+                if result['success']:
+                    used_methods = result['hybrid_info']['used_methods']
+                    method_key = ','.join(sorted(used_methods))
+                    method_stats[method_key] = method_stats.get(method_key, 0) + 1
+            
+            print(f"   方法使用统计:")
+            for methods, count in method_stats.items():
+                percentage = (count / successful_tests) * 100
+                print(f"      {methods}: {count} 次 ({percentage:.1f}%)")
+            
+            # 一致性检查
+            if successful_tests > 1:
+                results_set = set()
+                for result in results:
+                    if result['success']:
+                        results_set.add(result['display_name'])
+                
+                if len(results_set) == 1:
+                    print(f"   结果一致性: ✅ 完全一致 ({list(results_set)[0]})")
+                else:
+                    print(f"   结果一致性: ⚠️  不一致，共{len(results_set)}种结果: {', '.join(results_set)}")
+    
+    print("\n🎯 测试完成")
+    return 0
+
+if __name__ == "__main__":
+    # 检查是否有命令行参数
+    if len(sys.argv) > 1:
+        # 命令行模式
+        sys.exit(test_single_card_from_command_line())
+    else:
+        # 默认测试模式
+        print("🧪 测试混合扑克牌识别器")
+        print("=" * 60)
+        
+        # 显示可用能力
+        capabilities = get_hybrid_recognition_capabilities()
+        print("🔍 识别能力:")
+        for method, available in capabilities['available_methods'].items():
+            status = "✅ 可用" if available else "❌ 不可用"
+            print(f"   {method}: {status}")
+        
+        # 测试识别
+        test_images = [
+            ("src/image/cut/camera_001_zhuang_1.png", "src/image/cut/camera_001_zhuang_1_left.png"),
+            ("src/image/cut/camera_001_xian_1.png", "src/image/cut/camera_001_xian_1_left.png")
+        ]
+        
+        for main_image, left_image in test_images:
+            if os.path.exists(main_image):
+                print(f"\n📸 测试图片: {main_image}")
+                print("-" * 40)
+                
+                result = recognize_poker_card_hybrid(main_image, left_image)
+                
+                if result['success']:
+                    print("✅ 混合识别成功!")
+                    print(f"   结果: {result['display_name']}")
+                    print(f"   花色: {result['suit_name']} ({result['suit_symbol']})")
+                    print(f"   点数: {result['rank']}")
+                    print(f"   置信度: {result['confidence']:.3f}")
+                    print(f"   耗时: {result['recognition_duration']:.3f}秒")
+                    print(f"   使用方法: {result['hybrid_info']['used_methods']}")
+                    
+                    if result.get('validation_warnings'):
+                        print(f"   验证警告: {result['validation_warnings']}")
+                else:
+                    print("❌ 混合识别失败!")
+                    print(f"   错误: {result.get('error', '未知错误')}")
+                    print(f"   耗时: {result.get('recognition_duration', 0):.3f}秒")
+            else:
+                print(f"\n❌ 测试图片不存在: {main_image}")
+        
+        print("\n✅ 混合识别器测试完成")
+        print("\n💡 使用命令行参数进行单卡测试:")
+        print("   python poker_hybrid_recognizer.py --main 完整扑克牌图片.png --left 左上角图片.png")
+        print("   更多选项请使用: python poker_hybrid_recognizer.py --help")
