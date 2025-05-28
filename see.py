@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-扑克识别系统完整测试程序 - see.py
+扑克识别系统完整测试程序 - see.py (重写版本)
 功能:
-1. 读取摄像头配置
+1. 直接读取配置文件（修复路径问题）
 2. 拍照
 3. 裁剪图片
 4. 识别扑克牌
@@ -12,80 +12,36 @@
 
 import sys
 import time
+import json
 import argparse
 from pathlib import Path
 from typing import Dict, Any, List
 
-# 路径设置 - 修复版本
+# 重点修改1: 简化路径设置，直接使用当前目录结构
 def setup_project_paths():
-    """设置项目路径 - 修复版本"""
-    import os
-    
+    """设置项目路径 - 简化版本"""
     current_file = Path(__file__).resolve()
     project_root = current_file.parent
-    
-    print(f"[DEBUG] 当前文件: {current_file}")
-    print(f"[DEBUG] 当前工作目录: {os.getcwd()}")
-    print(f"[DEBUG] 检测项目根目录: {project_root}")
-    
-    # 检查关键目录和文件
-    src_dir = project_root / "src"
-    config_dir = project_root / "src" / "config" 
-    camera_json = config_dir / "camera.json"
-    
-    print(f"[DEBUG] src目录: {src_dir} (存在: {src_dir.exists()})")
-    print(f"[DEBUG] config目录: {config_dir} (存在: {config_dir.exists()})")
-    print(f"[DEBUG] camera.json: {camera_json} (存在: {camera_json.exists()})")
-    
-    # 如果配置文件不存在，尝试查找正确路径
-    if not camera_json.exists():
-        # 搜索可能的配置文件位置
-        possible_paths = [
-            project_root / "config" / "camera.json",
-            project_root / "src" / "config" / "camera.json", 
-            project_root.parent / "src" / "config" / "camera.json"
-        ]
-        
-        for path in possible_paths:
-            print(f"[DEBUG] 尝试路径: {path} (存在: {path.exists()})")
-            if path.exists():
-                # 找到正确路径，调整项目根目录
-                if "src" in path.parts:
-                    # 找到包含src的路径
-                    src_index = path.parts.index("src")
-                    project_root = Path(*path.parts[:src_index])
-                else:
-                    project_root = path.parent.parent
-                print(f"[DEBUG] 修正项目根目录为: {project_root}")
-                break
-    
-    # 设置工作目录
-    os.chdir(project_root)
-    print(f"[DEBUG] 切换工作目录到: {os.getcwd()}")
     
     # 将项目根目录添加到Python路径
     project_root_str = str(project_root)
     if project_root_str not in sys.path:
         sys.path.insert(0, project_root_str)
-        print(f"[DEBUG] 已添加到Python路径: {project_root_str}")
     
     return project_root
 
-# 设置项目路径
 PROJECT_ROOT = setup_project_paths()
-
-# 导入系统模块
-from config_loader import get_enabled_cameras, get_camera_by_id
-from state_manager import register_process, unregister_process, lock_camera, release_camera
 
 class PokerRecognitionTester:
     """扑克识别系统测试器"""
     
     def __init__(self):
         """初始化测试器"""
-        self.process_name = "see_test"
-        self.process_type = "testing"
         self.selected_camera_id = None
+        self.camera_config = None
+        
+        # 重点修改2: 直接设置配置文件路径
+        self.config_file = PROJECT_ROOT / "src" / "config" / "camera.json"
         
         # 统计信息
         self.stats = {
@@ -103,32 +59,14 @@ class PokerRecognitionTester:
             print("🚀 初始化扑克识别测试系统...")
             print("=" * 60)
             
-            # 验证路径设置
-            print("🔍 验证路径设置...")
-            try:
-                from src.core.utils import get_config_dir
-                config_dir = get_config_dir()
-                camera_json = config_dir / "camera.json"
-                
-                print(f"   配置目录: {config_dir}")
-                print(f"   camera.json: {camera_json}")
-                print(f"   配置文件存在: {camera_json.exists()}")
-                
-                if not camera_json.exists():
-                    print("❌ 配置文件不存在，请检查路径设置")
-                    return False
-                    
-            except Exception as e:
-                print(f"❌ 路径验证失败: {e}")
+            # 重点修改3: 直接验证配置文件路径
+            print(f"🔍 验证配置文件: {self.config_file}")
+            
+            if not self.config_file.exists():
+                print(f"❌ 配置文件不存在: {self.config_file}")
                 return False
             
-            # 注册进程
-            register_result = register_process(self.process_name, self.process_type)
-            if register_result['status'] != 'success':
-                print(f"❌ 进程注册失败: {register_result['message']}")
-                return False
-            
-            print("✅ 进程注册成功")
+            print("✅ 配置文件存在")
             return True
             
         except Exception as e:
@@ -136,29 +74,33 @@ class PokerRecognitionTester:
             return False
     
     def step1_read_cameras(self) -> bool:
-        """步骤1: 读取摄像头配置"""
+        """步骤1: 读取摄像头配置 - 重点修改4: 直接读取JSON文件"""
         try:
             print("\n📷 步骤1: 读取摄像头配置")
             print("-" * 40)
             
-            # 获取启用的摄像头
-            cameras_result = get_enabled_cameras()
-            if cameras_result['status'] != 'success':
-                print(f"❌ 获取摄像头配置失败: {cameras_result['message']}")
+            # 直接读取配置文件
+            with open(self.config_file, 'r', encoding='utf-8') as f:
+                self.camera_config = json.load(f)
+            
+            cameras = self.camera_config.get('cameras', [])
+            if not cameras:
+                print("❌ 没有找到摄像头配置")
                 return False
             
-            cameras = cameras_result['data']['cameras']
-            if not cameras:
+            # 过滤启用的摄像头
+            enabled_cameras = [c for c in cameras if c.get('enabled', True)]
+            if not enabled_cameras:
                 print("❌ 没有找到启用的摄像头")
                 return False
             
-            print(f"✅ 找到 {len(cameras)} 个启用的摄像头:")
-            for i, camera in enumerate(cameras):
+            print(f"✅ 找到 {len(enabled_cameras)} 个启用的摄像头:")
+            for i, camera in enumerate(enabled_cameras):
                 print(f"   {i+1}. {camera['name']} (ID: {camera['id']}) - IP: {camera['ip']}")
             
             # 选择第一个摄像头进行测试
-            self.selected_camera_id = cameras[0]['id']
-            selected_camera = cameras[0]
+            self.selected_camera_id = enabled_cameras[0]['id']
+            selected_camera = enabled_cameras[0]
             
             print(f"\n🎯 选择摄像头进行测试:")
             print(f"   ID: {selected_camera['id']}")
@@ -173,6 +115,25 @@ class PokerRecognitionTester:
         except Exception as e:
             print(f"❌ 读取摄像头配置异常: {e}")
             return False
+    
+    def get_camera_by_id(self, camera_id: str) -> Dict[str, Any]:
+        """根据ID获取摄像头配置 - 重点修改5: 本地实现"""
+        try:
+            if not self.camera_config:
+                return {'status': 'error', 'message': '配置未加载'}
+            
+            cameras = self.camera_config.get('cameras', [])
+            for camera in cameras:
+                if camera.get('id') == camera_id:
+                    return {
+                        'status': 'success', 
+                        'data': {'camera': camera}
+                    }
+            
+            return {'status': 'error', 'message': f'摄像头 {camera_id} 不存在'}
+            
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}
     
     def step2_take_photo(self) -> Dict[str, Any]:
         """步骤2: 拍照"""
@@ -588,25 +549,6 @@ class PokerRecognitionTester:
             
         except Exception as e:
             print(f"❌ 统计信息显示异常: {e}")
-    
-    def cleanup(self):
-        """清理资源"""
-        try:
-            print("\n🔄 清理系统资源...")
-            
-            # 注销进程
-            unregister_result = unregister_process()
-            if unregister_result['status'] == 'success':
-                print("✅ 进程注销成功")
-            
-            # 显示最终统计
-            if self.stats['total_tests'] > 0:
-                self.display_statistics()
-            
-            print("👋 扑克识别测试系统已安全关闭")
-            
-        except Exception as e:
-            print(f"❌ 系统清理异常: {e}")
 
 def parse_arguments():
     """解析命令行参数"""
@@ -651,8 +593,7 @@ def main():
         
         # 如果指定了摄像头ID，使用指定的摄像头
         if args.camera_id:
-            from config_loader import get_camera_by_id
-            camera_result = get_camera_by_id(args.camera_id)
+            camera_result = tester.get_camera_by_id(args.camera_id)
             if camera_result['status'] == 'success':
                 tester.selected_camera_id = args.camera_id
                 print(f"✅ 使用指定摄像头: {args.camera_id}")
@@ -701,8 +642,11 @@ def main():
         except KeyboardInterrupt:
             print("\n⏹️  测试被用户中断")
         
-        # 清理资源
-        tester.cleanup()
+        # 显示最终统计
+        if tester.stats['total_tests'] > 0:
+            tester.display_statistics()
+        
+        print("👋 扑克识别测试系统已关闭")
         
         return 0
         

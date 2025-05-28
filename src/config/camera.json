@@ -34,69 +34,69 @@
       "description": "监控主游戏桌面",
       "mark_positions": {
         "zhuang_1": {
-          "x": 1430.0,
-          "y": 892.0,
-          "width": 222.0,
-          "height": 297.0,
+          "x": 1427.0,
+          "y": 891.0,
+          "width": 224.0,
+          "height": 298.0,
           "marked": true,
           "label": "庄1",
           "description": "庄1位置",
-          "updated_at": "2025-05-28T10:21:39.238720",
+          "updated_at": "2025-05-28T13:10:51.724116",
           "validation_passed": true
         },
         "zhuang_2": {
-          "x": 1669.0,
-          "y": 891.0,
-          "width": 212.0,
-          "height": 299.0,
+          "x": 1671.0,
+          "y": 888.0,
+          "width": 219.0,
+          "height": 305.0,
           "marked": true,
           "label": "庄2",
           "description": "庄2位置",
-          "updated_at": "2025-05-28T10:21:39.238741",
+          "updated_at": "2025-05-28T13:10:51.724127",
           "validation_passed": true
         },
         "zhuang_3": {
-          "x": 1553.0,
-          "y": 604.0,
-          "width": 255.0,
-          "height": 184.0,
+          "x": 1556.0,
+          "y": 605.0,
+          "width": 260.0,
+          "height": 177.0,
           "marked": true,
           "label": "庄3",
           "description": "庄3位置",
-          "updated_at": "2025-05-28T10:21:39.238747",
+          "updated_at": "2025-05-28T13:10:51.724133",
           "validation_passed": true
         },
         "xian_1": {
-          "x": 1976.0,
-          "y": 894.0,
-          "width": 216.0,
-          "height": 287.0,
+          "x": 822.0,
+          "y": 891.0,
+          "width": 211.0,
+          "height": 302.0,
           "marked": true,
           "label": "闲1",
           "description": "闲1位置",
-          "updated_at": "2025-05-28T10:21:39.238751",
+          "updated_at": "2025-05-28T13:10:51.724137",
           "validation_passed": true
         },
         "xian_2": {
-          "x": 2219.0,
-          "y": 896.0,
-          "width": 222.0,
-          "height": 291.0,
+          "x": 1066.0,
+          "y": 892.0,
+          "width": 216.0,
+          "height": 303.0,
           "marked": true,
           "label": "闲2",
           "description": "闲2位置",
-          "updated_at": "2025-05-28T10:21:39.238756",
+          "updated_at": "2025-05-28T13:10:51.724141",
           "validation_passed": true
         },
         "xian_3": {
-          "x": 2069.0,
-          "y": 614.0,
-          "width": 300.0,
-          "height": 191.0,
+          "x": 969.0,
+          "y": 605.0,
+          "width": 260.0,
+          "height": 196.0,
           "marked": true,
           "label": "闲3",
           "description": "闲3位置",
-          "updated_at": "2025-05-28T10:21:39.238759",
+          "updated_at": "2025-05-28T13:10:51.724145",
           "validation_passed": true
         }
       }
@@ -121,7 +121,7 @@
           "marked": true,
           "label": "庄1",
           "description": "庄1位置",
-          "updated_at": "2025-05-28T10:23:05.237643",
+          "updated_at": "2025-05-28T12:35:02.380546",
           "validation_passed": true
         },
         "zhuang_2": {
@@ -132,7 +132,7 @@
           "marked": true,
           "label": "庄2",
           "description": "庄2位置",
-          "updated_at": "2025-05-28T10:23:05.237652",
+          "updated_at": "2025-05-28T12:35:02.380555",
           "validation_passed": true
         },
         "zhuang_3": {
@@ -143,7 +143,7 @@
           "marked": true,
           "label": "庄3",
           "description": "庄3位置",
-          "updated_at": "2025-05-28T10:23:05.237657",
+          "updated_at": "2025-05-28T12:35:02.380559",
           "validation_passed": true
         },
         "xian_1": {
@@ -154,7 +154,7 @@
           "marked": true,
           "label": "闲1",
           "description": "闲1位置",
-          "updated_at": "2025-05-28T10:23:05.237661",
+          "updated_at": "2025-05-28T12:35:02.380563",
           "validation_passed": true
         },
         "xian_2": {
@@ -165,7 +165,7 @@
           "marked": true,
           "label": "闲2",
           "description": "闲2位置",
-          "updated_at": "2025-05-28T10:23:05.237665",
+          "updated_at": "2025-05-28T12:35:02.380567",
           "validation_passed": true
         },
         "xian_3": {
@@ -176,7 +176,7 @@
           "marked": true,
           "label": "闲3",
           "description": "闲3位置",
-          "updated_at": "2025-05-28T10:23:05.237673",
+          "updated_at": "2025-05-28T12:35:02.380572",
           "validation_passed": true
         }
       }
@@ -194,58 +194,70 @@
       "description": "监控侧面游戏桌",
       "mark_positions": {
         "zhuang_1": {
-          "x": 968,
-          "y": 80,
-          "width": 317,
-          "height": 305,
+          "x": 968.0,
+          "y": 80.0,
+          "width": 317.0,
+          "height": 305.0,
           "marked": true,
           "label": "庄1",
-          "description": "庄家位置1"
+          "description": "庄家位置1",
+          "updated_at": "2025-05-28T12:34:58.418953",
+          "validation_passed": true
         },
         "zhuang_2": {
-          "x": 1413,
-          "y": 180,
-          "width": 117,
-          "height": 240,
+          "x": 1413.0,
+          "y": 180.0,
+          "width": 117.0,
+          "height": 240.0,
           "marked": true,
           "label": "庄2",
-          "description": "庄家位置2"
+          "description": "庄家位置2",
+          "updated_at": "2025-05-28T12:34:58.418966",
+          "validation_passed": true
         },
         "zhuang_3": {
-          "x": 1188,
-          "y": 519,
-          "width": 168,
-          "height": 129,
+          "x": 1188.0,
+          "y": 519.0,
+          "width": 168.0,
+          "height": 129.0,
           "marked": true,
           "label": "庄3",
-          "description": "庄家位置3"
+          "description": "庄家位置3",
+          "updated_at": "2025-05-28T12:34:58.418972",
+          "validation_passed": true
         },
         "xian_1": {
-          "x": 1627,
-          "y": 182,
-          "width": 127,
-          "height": 295,
+          "x": 1627.0,
+          "y": 182.0,
+          "width": 127.0,
+          "height": 295.0,
           "marked": true,
           "label": "闲1",
-          "description": "闲家位置1"
+          "description": "闲家位置1",
+          "updated_at": "2025-05-28T12:34:58.418976",
+          "validation_passed": true
         },
         "xian_2": {
-          "x": 544,
-          "y": 119,
-          "width": 290,
-          "height": 206,
+          "x": 544.0,
+          "y": 119.0,
+          "width": 290.0,
+          "height": 206.0,
           "marked": true,
           "label": "闲2",
-          "description": "闲家位置2"
+          "description": "闲家位置2",
+          "updated_at": "2025-05-28T12:34:58.418980",
+          "validation_passed": true
         },
         "xian_3": {
-          "x": 692,
-          "y": 450,
-          "width": 256,
-          "height": 191,
+          "x": 692.0,
+          "y": 450.0,
+          "width": 256.0,
+          "height": 191.0,
           "marked": true,
           "label": "闲3",
-          "description": "闲家位置3"
+          "description": "闲家位置3",
+          "updated_at": "2025-05-28T12:34:58.418984",
+          "validation_passed": true
         }
       }
     }
