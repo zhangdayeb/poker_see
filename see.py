@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-扑克识别系统完整测试程序 - see.py (重写版本)
+扑克识别系统完整测试程序 - see.py (无OCR版本)
 功能:
 1. 直接读取配置文件（修复路径问题）
 2. 拍照
 3. 裁剪图片
-4. 识别扑克牌
+4. 识别扑克牌 (仅使用YOLO)
 5. 展示结果
 """
 
@@ -51,7 +51,7 @@ class PokerRecognitionTester:
             'start_time': time.time()
         }
         
-        print("🎮 扑克识别系统测试器初始化完成")
+        print("🎮 扑克识别系统测试器初始化完成 (仅YOLO模式)")
     
     def initialize(self) -> bool:
         """初始化系统"""
@@ -67,6 +67,7 @@ class PokerRecognitionTester:
                 return False
             
             print("✅ 配置文件存在")
+            print("ℹ️  注意: 当前版本仅使用YOLO识别，不支持OCR功能")
             return True
             
         except Exception as e:
@@ -208,17 +209,25 @@ class PokerRecognitionTester:
                 cut_dir = image_file.parent / "cut"
                 
                 if cut_dir.exists():
-                    # 查找所有裁剪后的图片
+                    # 查找所有裁剪后的图片，但不包括左上角图片（因为不需要OCR）
                     pattern = f"{image_file.stem}_*.png"
-                    cropped_files = list(cut_dir.glob(pattern))
+                    all_files = list(cut_dir.glob(pattern))
+                    
+                    # 过滤掉左上角图片（_left.png）
+                    cropped_files = [f for f in all_files if not f.name.endswith('_left.png')]
                     
                     # 按文件名排序
                     cropped_files.sort(key=lambda x: x.name)
                     
-                    print(f"   生成裁剪图片: {len(cropped_files)} 个")
+                    print(f"   生成裁剪图片: {len(cropped_files)} 个 (已排除左上角图片)")
                     for i, crop_file in enumerate(cropped_files):
                         file_size = crop_file.stat().st_size
                         print(f"   {i+1}. {crop_file.name} ({file_size} bytes)")
+                    
+                    # 显示被排除的左上角图片
+                    left_files = [f for f in all_files if f.name.endswith('_left.png')]
+                    if left_files:
+                        print(f"   排除左上角图片: {len(left_files)} 个 (无需OCR)")
                     
                     return {
                         'success': True,
@@ -238,9 +247,9 @@ class PokerRecognitionTester:
             return {'success': False, 'error': str(e)}
     
     def step4_recognize_images(self, cropped_files: List[str]) -> Dict[str, Any]:
-        """步骤4: 识别扑克牌"""
+        """步骤4: 识别扑克牌 (仅使用YOLO)"""
         try:
-            print("\n🧠 步骤4: 识别扑克牌")
+            print("\n🧠 步骤4: 识别扑克牌 (仅YOLO模式)")
             print("-" * 40)
             
             recognition_results = {}
@@ -256,11 +265,11 @@ class PokerRecognitionTester:
                 print(f"\n   ({i+1}/{total_count}) 识别位置: {position}")
                 print(f"   文件: {image_file.name}")
                 
-                # 使用混合识别方法
-                result = self._recognize_single_image(image_path)
+                # 仅使用YOLO识别
+                result = self._recognize_with_yolo_only(image_path)
                 
                 if result['success']:
-                    print(f"   ✅ {result['display_name']} (置信度: {result.get('confidence', 0):.3f}, 方法: {result.get('method', 'unknown')})")
+                    print(f"   ✅ {result['display_name']} (置信度: {result.get('confidence', 0):.3f})")
                     successful_count += 1
                 else:
                     print(f"   ❌ 识别失败: {result.get('error', '未知错误')}")
@@ -285,46 +294,20 @@ class PokerRecognitionTester:
             print(f"❌ 识别异常: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _recognize_single_image(self, image_path: str) -> Dict[str, Any]:
-        """识别单张图片"""
+    def _recognize_with_yolo_only(self, image_path: str) -> Dict[str, Any]:
+        """仅使用YOLO识别扑克牌"""
         try:
-            # 先尝试YOLO识别
+            # 仅使用YOLO识别
             yolo_result = self._recognize_with_yolo(image_path)
             
-            # 如果YOLO成功且置信度高，直接返回
-            if yolo_result['success'] and yolo_result.get('confidence', 0) >= 0.8:
-                yolo_result['method'] = 'yolo'
-                return yolo_result
-            
-            # 否则尝试OCR（针对左上角图片）
-            left_image_path = self._get_left_corner_image(image_path)
-            if left_image_path:
-                ocr_result = self._recognize_with_ocr(left_image_path)
-                
-                if ocr_result['success']:
-                    # 如果YOLO也成功，结合结果
-                    if yolo_result['success']:
-                        return {
-                            'success': True,
-                            'suit': yolo_result.get('suit', ''),
-                            'rank': ocr_result.get('rank', ''),
-                            'display_name': f"{yolo_result.get('suit_symbol', '')}{ocr_result.get('rank', '')}",
-                            'confidence': (yolo_result.get('confidence', 0) + ocr_result.get('confidence', 0)) / 2,
-                            'method': 'hybrid'
-                        }
-                    else:
-                        ocr_result['method'] = 'ocr'
-                        return ocr_result
-            
-            # 如果都失败，返回YOLO结果
             if yolo_result['success']:
-                yolo_result['method'] = 'yolo_fallback'
+                yolo_result['method'] = 'yolo'
                 return yolo_result
             else:
                 return {
                     'success': False,
-                    'error': yolo_result.get('error', '识别失败'),
-                    'method': 'failed'
+                    'error': yolo_result.get('error', 'YOLO识别失败'),
+                    'method': 'yolo_failed'
                 }
                 
         except Exception as e:
@@ -362,64 +345,6 @@ class PokerRecognitionTester:
                 'error': f'YOLO识别异常: {str(e)}'
             }
     
-    def _recognize_with_ocr(self, image_path: str) -> Dict[str, Any]:
-        """使用OCR识别"""
-        try:
-            # 优先使用PaddleOCR
-            try:
-                from src.processors.poker_paddle_ocr import recognize_poker_character
-                result = recognize_poker_character(image_path)
-                
-                if result['success']:
-                    return {
-                        'success': True,
-                        'rank': result['character'],
-                        'display_name': result['character'],
-                        'confidence': result['confidence']
-                    }
-                else:
-                    raise Exception(result['error'])
-                    
-            except ImportError:
-                # 使用EasyOCR
-                from src.processors.poker_ocr import recognize_poker_character
-                result = recognize_poker_character(image_path)
-                
-                if result['success']:
-                    return {
-                        'success': True,
-                        'rank': result['character'],
-                        'display_name': result['character'],
-                        'confidence': result['confidence']
-                    }
-                else:
-                    return {
-                        'success': False,
-                        'error': result['error']
-                    }
-                    
-        except Exception as e:
-            return {
-                'success': False,
-                'error': f'OCR识别异常: {str(e)}'
-            }
-    
-    def _get_left_corner_image(self, image_path: str) -> str:
-        """获取左上角图片路径"""
-        try:
-            image_file = Path(image_path)
-            # 查找对应的左上角图片
-            left_pattern = f"{image_file.stem}_left.png"
-            left_file = image_file.parent / left_pattern
-            
-            if left_file.exists():
-                return str(left_file)
-            else:
-                return None
-                
-        except Exception:
-            return None
-    
     def _extract_position_from_filename(self, filename: str) -> str:
         """从文件名提取位置信息"""
         try:
@@ -449,7 +374,7 @@ class PokerRecognitionTester:
                 'xian_1': '闲家1', 'xian_2': '闲家2', 'xian_3': '闲家3'
             }
             
-            print("详细识别结果:")
+            print("详细识别结果 (仅YOLO):")
             print("-" * 60)
             
             # 按位置顺序显示
@@ -464,15 +389,13 @@ class PokerRecognitionTester:
                     if result['success']:
                         display_name = result.get('display_name', 'N/A')
                         confidence = result.get('confidence', 0)
-                        method = result.get('method', 'unknown')
                         
                         status_icon = "✅"
-                        status_text = f"{display_name} (置信度: {confidence:.3f}, 方法: {method})"
+                        status_text = f"{display_name} (置信度: {confidence:.3f})"
                     else:
                         status_icon = "❌"
                         error = result.get('error', '未知错误')
-                        method = result.get('method', 'unknown')
-                        status_text = f"识别失败 ({method}: {error})"
+                        status_text = f"识别失败 ({error})"
                 else:
                     status_icon = "⚪"
                     status_text = "未处理"
@@ -482,6 +405,7 @@ class PokerRecognitionTester:
             print("-" * 60)
             print(f"总计: {results['successful_count']}/{results['total_count']} 成功 "
                   f"(成功率: {results['success_rate']:.1f}%)")
+            print("ℹ️  注意: 当前版本仅使用YOLO识别，未使用OCR功能")
             
         except Exception as e:
             print(f"❌ 显示结果异常: {e}")
@@ -489,7 +413,7 @@ class PokerRecognitionTester:
     def run_complete_test(self) -> bool:
         """运行完整测试流程"""
         try:
-            print(f"\n🎯 开始完整识别测试流程")
+            print(f"\n🎯 开始完整识别测试流程 (仅YOLO)")
             print(f"摄像头: {self.selected_camera_id}")
             print("=" * 60)
             
@@ -545,6 +469,7 @@ class PokerRecognitionTester:
                 print(f"成功率: {success_rate:.1f}%")
             
             print(f"总运行时间: {total_time:.1f} 秒")
+            print(f"识别模式: 仅YOLO (已禁用OCR)")
             print("=" * 40)
             
         except Exception as e:
@@ -553,7 +478,7 @@ class PokerRecognitionTester:
 def parse_arguments():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(
-        description='扑克识别系统完整测试程序',
+        description='扑克识别系统完整测试程序 (仅YOLO版本)',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:
@@ -561,6 +486,8 @@ def parse_arguments():
   python see.py --auto             # 自动循环测试
   python see.py --count 5          # 连续测试5次
   python see.py --camera 002       # 指定摄像头ID
+
+注意: 当前版本仅使用YOLO识别，不支持OCR功能
         """
     )
     
