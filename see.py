@@ -16,6 +16,7 @@ import signal
 import argparse
 import os
 from pathlib import Path
+from typing import Dict, Any, List, Optional  # 添加类型注解导入
 
 # 路径设置
 def setup_project_paths():
