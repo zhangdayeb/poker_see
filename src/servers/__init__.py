@@ -20,19 +20,8 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import http_server module: {e}")
 
-# 尝试导入 WebSocket 服务器
-try:
-    from .websocket_server import start_websocket_server, stop_websocket_server, get_websocket_server_info
-    
-    __all__.extend([
-        'start_websocket_server',
-        'stop_websocket_server',
-        'get_websocket_server_info'
-    ])
-    
-except ImportError as e:
-    print(f"Warning: Could not import websocket_server module: {e}")
-
 # 如果没有任何模块可导入
 if not __all__:
     print("Warning: No server modules could be imported")
+else:
+    print(f"Server module loaded successfully with {len(__all__)} functions")

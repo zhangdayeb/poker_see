@@ -3,11 +3,10 @@
 """
 扑克识别系统 - 主程序入口
 功能:
-1. 启动HTTP服务器和WebSocket服务器
+1. 启动HTTP服务器
 2. 系统初始化和配置检查
-3. 服务间协调和数据共享
-4. 优雅关闭和资源清理
-5. 命令行参数处理
+3. 优雅关闭和资源清理
+4. 命令行参数处理
 """
 
 import sys
@@ -48,8 +47,6 @@ def safe_import():
             log_info, log_success, log_error, log_warning
         )
         from src.servers.http_server import start_http_server, stop_http_server, get_server_info
-        from src.servers.websocket_server import start_websocket_server, stop_websocket_server, get_websocket_server_info
-        from src.websocket.connection_manager import cleanup_all_connections, get_connection_stats
         from src.core.config_manager import get_config_status
         
         return {
@@ -69,15 +66,6 @@ def safe_import():
                 'stop_http_server': stop_http_server,
                 'get_server_info': get_server_info
             },
-            'websocket_server': {
-                'start_websocket_server': start_websocket_server,
-                'stop_websocket_server': stop_websocket_server,
-                'get_websocket_server_info': get_websocket_server_info
-            },
-            'connection_manager': {
-                'cleanup_all_connections': cleanup_all_connections,
-                'get_connection_stats': get_connection_stats
-            },
             'config_manager': {
                 'get_config_status': get_config_status
             }
@@ -96,7 +84,7 @@ def safe_import():
             print(f"✅ src目录存在: {src_dir}")
             
             # 检查子目录
-            subdirs = ['core', 'servers', 'websocket']
+            subdirs = ['core', 'servers']
             for subdir in subdirs:
                 subdir_path = src_dir / subdir
                 if subdir_path.exists():
@@ -115,16 +103,12 @@ class PokerRecognitionSystem:
     def __init__(self):
         """初始化系统"""
         self.http_server_running = False
-        self.websocket_server_running = False
         self.shutdown_requested = False
         
         # 默认配置
         self.config = {
             'http_host': 'localhost',
             'http_port': 8000,
-            'websocket_host': 'localhost',
-            'websocket_port': 8001,
-            'auto_start_websocket': True,
             'log_level': 'INFO'
         }
         
@@ -162,7 +146,7 @@ class PokerRecognitionSystem:
             modules['utils']['log_error'](f"系统初始化失败: {e}", "MAIN")
             return False
     
-    def start_services(self, http_only: bool = False) -> bool:
+    def start_services(self) -> bool:
         """启动服务"""
         try:
             # 启动HTTP服务器
@@ -181,27 +165,6 @@ class PokerRecognitionSystem:
             else:
                 modules['utils']['log_error']("HTTP服务器启动失败", "MAIN")
                 return False
-            
-            # 启动WebSocket服务器（如果需要）
-            if not http_only and self.config['auto_start_websocket']:
-                modules['utils']['log_info']("启动WebSocket服务器...", "MAIN")
-                ws_result = modules['websocket_server']['start_websocket_server'](
-                    self.config['websocket_host'], 
-                    self.config['websocket_port']
-                )
-                
-                if ws_result['status'] == 'success':
-                    self.websocket_server_running = True
-                    modules['utils']['log_success'](
-                        f"WebSocket服务器启动成功: ws://{self.config['websocket_host']}:{self.config['websocket_port']}", 
-                        "MAIN"
-                    )
-                else:
-                    modules['utils']['log_warning'](
-                        f"WebSocket服务器启动失败: {ws_result.get('message', 'Unknown error')}", 
-                        "MAIN"
-                    )
-                    modules['utils']['log_warning']("系统将以HTTP模式运行", "MAIN")
             
             return True
             
@@ -232,25 +195,18 @@ class PokerRecognitionSystem:
             missing_deps = []
             versions = {}
             
-            # 检查websockets库
-            try:
-                import websockets
-                versions['websockets'] = websockets.__version__
-            except ImportError:
-                missing_deps.append("websockets")
-            
             # 检查其他关键库
-            try:
-                import asyncio
-                versions['asyncio'] = "内置"
-            except ImportError:
-                missing_deps.append("asyncio")
-            
             try:
                 from pathlib import Path
                 versions['pathlib'] = "内置"
             except ImportError:
                 missing_deps.append("pathlib")
+            
+            try:
+                import json
+                versions['json'] = "内置"
+            except ImportError:
+                missing_deps.append("json")
             
             if missing_deps:
                 return f"缺少依赖: {', '.join(missing_deps)}"
@@ -273,16 +229,11 @@ class PokerRecognitionSystem:
             print(f"   📚 API文档: http://{self.config['http_host']}:{self.config['http_port']}/api-docs")
             print(f"   🎯 标记页面: http://{self.config['http_host']}:{self.config['http_port']}/biaoji.html")
         
-        # WebSocket服务器信息
-        if self.websocket_server_running:
-            print(f"🔌 WebSocket服务器: ws://{self.config['websocket_host']}:{self.config['websocket_port']}")
-            print(f"   🤵 荷官端连接地址: ws://{self.config['websocket_host']}:{self.config['websocket_port']}")
-        
         print("\n💡 使用说明:")
         print("1. 浏览器访问HTTP服务器进行配置和管理")
-        print("2. 荷官端通过WebSocket连接获取识别结果")
-        print("3. API接口支持扑克识别结果的接收和查询")
-        print("4. 按 Ctrl+C 优雅停止所有服务")
+        print("2. API接口支持扑克识别结果的接收和查询")
+        print("3. 支持RTSP摄像头拍照和位置标记")
+        print("4. 按 Ctrl+C 优雅停止服务")
         print("=" * 60)
     
     def run_main_loop(self):
@@ -319,19 +270,6 @@ class PokerRecognitionSystem:
                 http_info = modules['http_server']['get_server_info']()
                 if not http_info.get('running', False):
                     modules['utils']['log_warning']("HTTP服务器状态异常", "MAIN")
-            
-            # 检查WebSocket服务器
-            if self.websocket_server_running:
-                ws_info = modules['websocket_server']['get_websocket_server_info']()
-                if ws_info['status'] != 'success' or not ws_info['data'].get('running', False):
-                    modules['utils']['log_warning']("WebSocket服务器状态异常", "MAIN")
-            
-            # 检查连接统计（仅记录，不输出到控制台）
-            conn_stats = modules['connection_manager']['get_connection_stats']()
-            if conn_stats['status'] == 'success':
-                active_connections = conn_stats['data'].get('current_active', 0)
-                if active_connections > 0:
-                    modules['utils']['log_info'](f"活跃连接: {active_connections}", "MAIN")
                     
         except Exception as e:
             modules['utils']['log_error'](f"健康检查失败: {e}", "MAIN")
@@ -346,19 +284,6 @@ class PokerRecognitionSystem:
         try:
             print("\n🔄 正在关闭系统...")
             
-            # 关闭WebSocket服务器
-            if self.websocket_server_running:
-                modules['utils']['log_info']("关闭WebSocket服务器...", "MAIN")
-                ws_result = modules['websocket_server']['stop_websocket_server']()
-                if ws_result['status'] == 'success':
-                    modules['utils']['log_success']("WebSocket服务器已关闭", "MAIN")
-                else:
-                    modules['utils']['log_warning'](
-                        f"WebSocket服务器关闭异常: {ws_result.get('message', 'Unknown')}", 
-                        "MAIN"
-                    )
-                self.websocket_server_running = False
-            
             # 关闭HTTP服务器
             if self.http_server_running:
                 modules['utils']['log_info']("关闭HTTP服务器...", "MAIN")
@@ -368,10 +293,6 @@ class PokerRecognitionSystem:
                 else:
                     modules['utils']['log_warning']("HTTP服务器关闭异常", "MAIN")
                 self.http_server_running = False
-            
-            # 清理连接
-            modules['utils']['log_info']("清理系统资源...", "MAIN")
-            modules['connection_manager']['cleanup_all_connections']()
             
             modules['utils']['log_success']("系统关闭完成", "MAIN")
             print("👋 扑克识别系统已安全关闭")
@@ -383,14 +304,12 @@ class PokerRecognitionSystem:
 def parse_arguments():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(
-        description='扑克识别系统 - 提供HTTP API和WebSocket服务',
+        description='扑克识别系统 - 提供HTTP API服务',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:
   python main.py                          # 使用默认配置启动
   python main.py --http-port 8080        # 指定HTTP端口
-  python main.py --websocket-port 8002   # 指定WebSocket端口
-  python main.py --http-only             # 仅启动HTTP服务器
   python main.py --host 0.0.0.0          # 监听所有网络接口
   python main.py --check-paths           # 检查路径配置
         """
@@ -400,12 +319,6 @@ def parse_arguments():
                        help='服务器监听地址 (默认: localhost)')
     parser.add_argument('--http-port', type=int, default=8000,
                        help='HTTP服务器端口 (默认: 8000)')
-    parser.add_argument('--websocket-port', type=int, default=8001,
-                       help='WebSocket服务器端口 (默认: 8001)')
-    parser.add_argument('--http-only', action='store_true',
-                       help='仅启动HTTP服务器，不启动WebSocket服务器')
-    parser.add_argument('--no-websocket', action='store_true',
-                       help='禁用WebSocket服务器')
     parser.add_argument('--check-paths', action='store_true',
                        help='检查路径配置并退出')
     parser.add_argument('--version', action='version', version='扑克识别系统 v2.1')
@@ -427,12 +340,11 @@ def check_project_structure():
         ("src", "源代码目录"),
         ("src/core", "核心模块目录"),
         ("src/servers", "服务器模块目录"),
-        ("src/websocket", "WebSocket模块目录"),
+        ("src/clients", "客户端模块目录"),
         ("src/core/utils.py", "工具模块"),
         ("src/core/config_manager.py", "配置管理模块"),
         ("src/servers/http_server.py", "HTTP服务器模块"),
-        ("src/servers/websocket_server.py", "WebSocket服务器模块"),
-        ("src/websocket/connection_manager.py", "连接管理模块"),
+        ("src/clients", "推送客户端目录"),
     ]
     
     print("\n📋 目录结构检查:")
@@ -462,10 +374,7 @@ def main():
         # 更新配置
         system.config.update({
             'http_host': args.host,
-            'http_port': args.http_port,
-            'websocket_host': args.host,
-            'websocket_port': args.websocket_port,
-            'auto_start_websocket': not (args.http_only or args.no_websocket)
+            'http_port': args.http_port
         })
         
         # 初始化系统
@@ -474,7 +383,7 @@ def main():
             return 1
         
         # 启动服务
-        if not system.start_services(http_only=args.http_only):
+        if not system.start_services():
             print("❌ 服务启动失败")
             return 1
         
