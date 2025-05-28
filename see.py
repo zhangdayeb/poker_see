@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-扑克识别系统完整测试程序 - see.py (增强版)
+扑克识别系统完整测试程序 - see.py (增强版混合识别)
 功能:
 1. 使用统一配置加载器
 2. 拍照
-3. 裁剪图片
+3. 裁剪图片 
 4. 混合识别扑克牌 (YOLO + OCR + OpenCV)
 5. 结果合并和分析
 6. 展示详细结果
@@ -40,6 +40,32 @@ class EnhancedPokerRecognitionTester:
         self.selected_camera_id = None
         self.camera_config = None
         
+        # 混合识别器配置
+        self.recognition_config = {
+            # YOLO配置
+            'yolo_enabled': True,
+            'yolo_confidence_threshold': 0.3,
+            'yolo_high_confidence_threshold': 0.8,
+            
+            # OCR配置
+            'ocr_enabled': True,
+            'ocr_confidence_threshold': 0.3,
+            'ocr_prefer_paddle': True,
+            
+            # OpenCV花色识别配置
+            'opencv_suit_enabled': True,
+            'opencv_suit_confidence_threshold': 0.4,
+            
+            # 融合策略
+            'fusion_strategy': 'weighted',  # weighted, voting, priority
+            'min_confidence_for_result': 0.3,
+            'enable_result_validation': True,
+            
+            # 调试配置
+            'debug_mode': False,
+            'save_intermediate_results': False
+        }
+        
         # 统计信息
         self.stats = {
             'total_tests': 0,
@@ -47,24 +73,32 @@ class EnhancedPokerRecognitionTester:
             'failed_tests': 0,
             'start_time': time.time(),
             'recognition_method_stats': {
-                'yolo_only': 0,
-                'hybrid': 0,
-                'ocr_only': 0,
-                'opencv_only': 0,
-                'failed': 0
+                'yolo_complete': 0,      # YOLO完整识别
+                'hybrid_combined': 0,    # 混合组合识别
+                'ocr_only': 0,          # 仅OCR识别
+                'opencv_only': 0,       # 仅OpenCV识别
+                'failed': 0             # 识别失败
+            },
+            'fusion_strategy_stats': {
+                'weighted': 0,
+                'voting': 0,
+                'priority': 0
             }
         }
         
-        print("🎮 增强版扑克识别系统测试器初始化完成")
+        print("🎮 增强版扑克识别系统测试器 (混合识别) 初始化完成")
     
     def initialize(self) -> bool:
         """初始化系统"""
         try:
-            print("🚀 初始化扑克识别测试系统...")
+            print("🚀 初始化扑克混合识别测试系统...")
             print("=" * 60)
             
             # 检查各个模块的可用性
             self._check_module_availability()
+            
+            # 检查混合识别器能力
+            self._check_hybrid_recognition_capabilities()
             
             return True
             
@@ -74,15 +108,13 @@ class EnhancedPokerRecognitionTester:
     
     def _check_module_availability(self):
         """检查模块可用性"""
-        print("🔍 检查模块可用性:")
+        print("🔍 检查核心模块可用性:")
         
-        # 检查配置加载器
+        # 检查配置管理器
         try:
             from src.core.config_manager import get_all_cameras
             config_result = get_all_cameras()
             print(f"   配置管理器: {'✅ 可用' if config_result['status'] == 'success' else '⚠️  有问题'}")
-            if config_result['status'] != 'success':
-                print(f"      问题: {config_result.get('message', '未知')}")
         except ImportError as e:
             print(f"   配置管理器: ❌ 导入失败 - {e}")
         
@@ -100,12 +132,45 @@ class EnhancedPokerRecognitionTester:
         except ImportError as e:
             print(f"   图片裁剪器: ❌ 导入失败 - {e}")
         
-        # 检查混合识别器
+        # 检查结果合并器
         try:
-            from src.processors.poker_recognizer import recognize_poker_card
-            print("   扑克识别器: ✅ 可用")
+            from src.processors.poker_result_merger import merge_poker_recognition_results
+            print("   结果合并器: ✅ 可用")
         except ImportError as e:
-            print(f"   扑克识别器: ❌ 导入失败 - {e}")
+            print(f"   结果合并器: ❌ 导入失败 - {e}")
+    
+    def _check_hybrid_recognition_capabilities(self):
+        """检查混合识别器能力"""
+        try:
+            from src.processors.poker_hybrid_recognizer import get_hybrid_recognition_capabilities
+            
+            capabilities = get_hybrid_recognition_capabilities()
+            
+            print("\n🧠 混合识别器能力检查:")
+            available_methods = capabilities.get('available_methods', {})
+            
+            for method, available in available_methods.items():
+                status = "✅ 可用" if available else "❌ 不可用" 
+                method_name = {
+                    'yolo': 'YOLO检测器',
+                    'ocr_easy': 'EasyOCR',
+                    'ocr_paddle': 'PaddleOCR', 
+                    'opencv_suit': 'OpenCV花色识别'
+                }.get(method, method)
+                print(f"   {method_name}: {status}")
+            
+            # 检查识别能力
+            caps = capabilities.get('capabilities', {})
+            print(f"\n🎯 识别能力:")
+            print(f"   完整识别: {'✅' if caps.get('complete_recognition') else '❌'}")
+            print(f"   点数识别: {'✅' if caps.get('rank_recognition') else '❌'}")
+            print(f"   花色识别: {'✅' if caps.get('suit_recognition') else '❌'}")
+            print(f"   混合融合: {'✅' if caps.get('hybrid_fusion') else '❌'}")
+            
+        except ImportError as e:
+            print(f"\n❌ 混合识别器导入失败: {e}")
+        except Exception as e:
+            print(f"\n⚠️  混合识别器检查异常: {e}")
     
     def step1_load_camera_config(self) -> bool:
         """步骤1: 读取摄像头配置"""
@@ -113,7 +178,6 @@ class EnhancedPokerRecognitionTester:
             print("\n📷 步骤1: 读取摄像头配置")
             print("-" * 50)
             
-            # 使用配置管理器
             from src.core.config_manager import get_all_cameras
             
             result = get_all_cameras()
@@ -137,7 +201,7 @@ class EnhancedPokerRecognitionTester:
                 print(f"   {i+1}. {camera['name']} (ID: {camera['id']}) - IP: {camera['ip']}")
             
             # 选择第一个摄像头进行测试
-            self.selected_camera_id = enabled_cameras[0]['id']
+            self.selected_camera_id = enabled_cameras[0]['id'] 
             selected_camera = enabled_cameras[0]
             
             print(f"\n🎯 选择摄像头进行测试:")
@@ -265,43 +329,66 @@ class EnhancedPokerRecognitionTester:
             print(f"❌ 裁剪图片异常: {e}")
             return {'success': False, 'error': str(e)}
     
-    def step4_recognize_cards(self, main_files: List[str], left_files: List[str]) -> Dict[str, Any]:
-        """步骤4: 识别扑克牌"""
+    def step4_recognize_cards_hybrid(self, main_files: List[str], left_files: List[str]) -> Dict[str, Any]:
+        """步骤4: 混合识别扑克牌"""
         try:
-            print("\n🧠 步骤4: 识别扑克牌")
+            print("\n🧠 步骤4: 混合识别扑克牌")
             print("-" * 50)
             
-            from src.processors.poker_recognizer import recognize_poker_card
+            from src.processors.poker_hybrid_recognizer import recognize_poker_card_hybrid
             
             position_results = {}
             successful_count = 0
             total_count = len(main_files)
             
-            print(f"开始识别 {total_count} 个图片区域...")
+            # 创建主图片和左上角图片的对应关系
+            main_to_left_map = self._create_image_mapping(main_files, left_files)
+            
+            print(f"开始混合识别 {total_count} 个图片区域...")
+            print(f"使用融合策略: {self.recognition_config['fusion_strategy']}")
             
             for i, main_image_path in enumerate(main_files):
                 main_image_file = Path(main_image_path)
                 position = self._extract_position_from_filename(main_image_file.name)
+                left_image_path = main_to_left_map.get(main_image_path)
                 
                 print(f"\n   ({i+1}/{total_count}) 识别位置: {position}")
-                print(f"   图片: {main_image_file.name}")
+                print(f"   主图片: {main_image_file.name}")
+                if left_image_path:
+                    print(f"   左上角: {Path(left_image_path).name}")
                 
-                # 使用YOLO识别器
-                result = recognize_poker_card(main_image_path)
+                # 使用混合识别器
+                start_time = time.time()
+                result = recognize_poker_card_hybrid(
+                    main_image_path, 
+                    left_image_path,
+                    config=self.recognition_config
+                )
+                duration = time.time() - start_time
                 
                 if result['success']:
                     print(f"   ✅ {result['display_name']} (置信度: {result.get('confidence', 0):.3f})")
+                    print(f"      方法: {', '.join(result.get('hybrid_info', {}).get('used_methods', []))}")
+                    print(f"      耗时: {duration:.3f}秒")
+                    
                     successful_count += 1
-                    self.stats['recognition_method_stats']['yolo_only'] += 1
+                    
+                    # 统计识别方法
+                    self._update_method_stats(result)
+                    
+                    # 显示验证警告
+                    if result.get('validation_warnings'):
+                        print(f"      ⚠️  验证警告: {', '.join(result['validation_warnings'])}")
                 else:
                     print(f"   ❌ 识别失败: {result.get('error', '未知错误')}")
+                    print(f"      耗时: {duration:.3f}秒")
                     self.stats['recognition_method_stats']['failed'] += 1
                 
                 position_results[position] = result
             
             success_rate = (successful_count / total_count * 100) if total_count > 0 else 0
             
-            print(f"\n🎯 识别完成:")
+            print(f"\n🎯 混合识别完成:")
             print(f"   成功: {successful_count}/{total_count}")
             print(f"   成功率: {success_rate:.1f}%")
             
@@ -314,14 +401,82 @@ class EnhancedPokerRecognitionTester:
             }
             
         except Exception as e:
-            print(f"❌ 识别异常: {e}")
+            print(f"❌ 混合识别异常: {e}")
             return {'success': False, 'error': str(e)}
     
-    def step5_display_results(self, position_results: Dict[str, Dict[str, Any]]):
-        """步骤5: 显示识别结果"""
+    def step5_merge_results(self, position_results: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """步骤5: 合并识别结果"""
         try:
-            print("\n📊 步骤5: 识别结果展示")
+            print("\n📊 步骤5: 合并识别结果")
+            print("-" * 50)
+            
+            from src.processors.poker_result_merger import merge_poker_recognition_results
+            
+            # 配置合并器
+            merger_config = {
+                'min_confidence_threshold': 0.3,
+                'high_confidence_threshold': 0.8,
+                'conflict_resolution_strategy': 'highest_confidence',
+                'enable_consistency_check': True,
+                'quality_assessment_enabled': True,
+                'duplicate_detection_enabled': True,
+                'include_metadata': True,
+                'include_quality_metrics': True,
+                'include_debug_info': self.recognition_config['debug_mode']
+            }
+            
+            metadata = {
+                'test_mode': True,
+                'fusion_strategy': self.recognition_config['fusion_strategy'],
+                'recognition_methods_used': list(self.stats['recognition_method_stats'].keys())
+            }
+            
+            start_time = time.time()
+            merge_result = merge_poker_recognition_results(
+                position_results,
+                camera_id=self.selected_camera_id,
+                metadata=metadata,
+                config=merger_config
+            )
+            duration = time.time() - start_time
+            
+            if merge_result['success']:
+                print(f"✅ 结果合并成功! (耗时: {duration:.3f}秒)")
+                
+                # 显示合并统计
+                summary = merge_result.get('summary', {})
+                print(f"   总位置: {summary.get('total_positions', 0)}")
+                print(f"   成功位置: {summary.get('successful_positions', 0)}")
+                print(f"   成功率: {summary.get('success_rate', 0):.1%}")
+                
+                # 显示质量评估
+                if 'quality' in merge_result:
+                    quality = merge_result['quality']
+                    print(f"   质量等级: {quality.get('quality_level', 'N/A')}")
+                    print(f"   质量评分: {quality.get('quality_score', 0):.3f}")
+                
+                # 显示警告
+                if merge_result.get('warnings'):
+                    print(f"   ⚠️  警告: {'; '.join(merge_result['warnings'])}")
+                
+                return merge_result
+            else:
+                print(f"❌ 结果合并失败: {merge_result.get('error', '未知错误')}")
+                return merge_result
+                
+        except Exception as e:
+            print(f"❌ 结果合并异常: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def step6_display_final_results(self, merge_result: Dict[str, Any]):
+        """步骤6: 显示最终结果"""
+        try:
+            print("\n📋 步骤6: 最终结果展示")
             print("=" * 60)
+            
+            if not merge_result.get('success', False):
+                print("❌ 无有效结果可显示")
+                return
             
             # 位置名称映射
             position_names = {
@@ -332,25 +487,33 @@ class EnhancedPokerRecognitionTester:
             print("🎴 各位置识别详情:")
             print("-" * 60)
             
-            # 按位置顺序显示
+            positions = merge_result.get('positions', {})
             standard_positions = ['zhuang_1', 'zhuang_2', 'zhuang_3', 'xian_1', 'xian_2', 'xian_3']
             
             for position in standard_positions:
                 position_name = position_names.get(position, position)
                 
-                if position in position_results:
-                    result = position_results[position]
+                if position in positions:
+                    result = positions[position]
                     
                     if result.get('success', False):
                         display_name = result.get('display_name', 'N/A')
                         confidence = result.get('confidence', 0)
+                        method = result.get('method', 'unknown')
                         
                         status_icon = "✅"
-                        status_text = f"{display_name} (置信度: {confidence:.3f})"
+                        status_text = f"{display_name} (置信度: {confidence:.3f}) [{method}]"
                         
                         # 显示详细信息
                         if 'suit_name' in result and 'rank' in result:
                             status_text += f" - {result['suit_name']} {result['rank']}"
+                        
+                        # 显示混合识别信息
+                        if 'hybrid_info' in result:
+                            hybrid_info = result['hybrid_info']
+                            if 'used_methods' in hybrid_info:
+                                methods_str = ', '.join(hybrid_info['used_methods'])
+                                status_text += f" (方法: {methods_str})"
                     else:
                         status_icon = "❌"
                         error = result.get('error', '未知错误')
@@ -362,26 +525,53 @@ class EnhancedPokerRecognitionTester:
                 print(f"   {position_name:>6}: {status_icon} {status_text}")
             
             # 显示汇总统计
-            successful_positions = sum(1 for result in position_results.values() if result.get('success', False))
-            total_positions = len(position_results)
-            success_rate = (successful_positions / total_positions * 100) if total_positions > 0 else 0
-            
+            summary = merge_result.get('summary', {})
             print("-" * 60)
             print(f"📈 汇总统计:")
-            print(f"   成功位置: {successful_positions}/{total_positions}")
-            print(f"   成功率: {success_rate:.1f}%")
+            print(f"   成功位置: {summary.get('successful_positions', 0)}/{summary.get('total_positions', 0)}")
+            print(f"   成功率: {summary.get('success_rate', 0):.1%}")
             
             # 显示识别的卡牌
-            recognized_cards = []
-            for result in position_results.values():
-                if result.get('success', False) and result.get('display_name'):
-                    recognized_cards.append(result['display_name'])
-            
+            recognized_cards = summary.get('recognized_cards', [])
             if recognized_cards:
                 print(f"   识别卡牌: {', '.join(recognized_cards)}")
             
+            # 显示质量信息
+            if 'quality' in merge_result:
+                quality = merge_result['quality']
+                print(f"\n🏆 质量评估:")
+                print(f"   质量等级: {quality.get('quality_level', 'N/A')}")
+                print(f"   质量评分: {quality.get('quality_score', 0):.3f}")
+                print(f"   平均置信度: {quality.get('confidence_stats', {}).get('average', 0):.3f}")
+                
+                if quality.get('suggestions'):
+                    print(f"   建议: {'; '.join(quality['suggestions'])}")
+            
+            # 显示处理时间
+            processing_duration = merge_result.get('processing_duration', 0)
+            recognition_duration = merge_result.get('recognition_duration', 0) 
+            print(f"\n⏱️  性能信息:")
+            print(f"   识别耗时: {recognition_duration:.3f}秒")
+            print(f"   合并耗时: {processing_duration:.3f}秒")
+            
         except Exception as e:
-            print(f"❌ 显示结果异常: {e}")
+            print(f"❌ 显示最终结果异常: {e}")
+    
+    def _create_image_mapping(self, main_files: List[str], left_files: List[str]) -> Dict[str, str]:
+        """创建主图片和左上角图片的对应关系"""
+        mapping = {}
+        
+        for main_file in main_files:
+            main_stem = Path(main_file).stem  # camera_001_zhuang_1
+            
+            # 查找对应的左上角图片
+            for left_file in left_files:
+                left_stem = Path(left_file).stem  # camera_001_zhuang_1_left
+                if left_stem.startswith(main_stem):
+                    mapping[main_file] = left_file  
+                    break
+        
+        return mapping
     
     def _extract_position_from_filename(self, filename: str) -> str:
         """从文件名提取位置信息"""
@@ -394,11 +584,37 @@ class EnhancedPokerRecognitionTester:
         except:
             return "unknown"
     
+    def _update_method_stats(self, result: Dict[str, Any]):
+        """更新识别方法统计"""
+        try:
+            method = result.get('method', 'unknown')
+            hybrid_info = result.get('hybrid_info', {})
+            used_methods = hybrid_info.get('used_methods', [])
+            fusion_strategy = hybrid_info.get('fusion_strategy', '')
+            
+            # 统计识别方法
+            if method == 'yolo' and len(used_methods) == 1:
+                self.stats['recognition_method_stats']['yolo_complete'] += 1
+            elif len(used_methods) > 1:
+                self.stats['recognition_method_stats']['hybrid_combined'] += 1
+            elif 'ocr' in used_methods:
+                self.stats['recognition_method_stats']['ocr_only'] += 1
+            elif 'opencv_suit' in used_methods:
+                self.stats['recognition_method_stats']['opencv_only'] += 1
+            
+            # 统计融合策略
+            if fusion_strategy in self.stats['fusion_strategy_stats']:
+                self.stats['fusion_strategy_stats'][fusion_strategy] += 1
+                
+        except Exception:
+            pass  # 忽略统计错误
+    
     def run_complete_test(self) -> bool:
         """运行完整测试流程"""
         try:
-            print(f"\n🎯 开始完整识别测试流程")
+            print(f"\n🎯 开始完整混合识别测试流程")
             print(f"摄像头: {self.selected_camera_id}")
+            print(f"融合策略: {self.recognition_config['fusion_strategy']}")
             print("=" * 60)
             
             self.stats['total_tests'] += 1
@@ -416,17 +632,23 @@ class EnhancedPokerRecognitionTester:
                 self.stats['failed_tests'] += 1
                 return False
             
-            # 步骤4: 识别
-            recognition_result = self.step4_recognize_cards(
-                crop_result['main_files'], 
+            # 步骤4: 混合识别
+            recognition_result = self.step4_recognize_cards_hybrid(
+                crop_result['main_files'],
                 crop_result['left_files']
             )
             if not recognition_result['success']:
                 self.stats['failed_tests'] += 1
                 return False
             
-            # 步骤5: 显示结果
-            self.step5_display_results(recognition_result['position_results'])
+            # 步骤5: 合并结果
+            merge_result = self.step5_merge_results(recognition_result['position_results'])
+            if not merge_result['success']:
+                self.stats['failed_tests'] += 1  
+                return False
+            
+            # 步骤6: 显示最终结果
+            self.step6_display_final_results(merge_result)
             
             duration = time.time() - start_time
             print(f"\n⏱️  总耗时: {duration:.2f} 秒")
@@ -461,11 +683,29 @@ class EnhancedPokerRecognitionTester:
             method_stats = self.stats['recognition_method_stats']
             total_recognitions = sum(method_stats.values())
             if total_recognitions > 0:
-                print(f"\n识别方法统计 (总计: {total_recognitions} 次):")
+                print(f"\n🧠 识别方法统计 (总计: {total_recognitions} 次):")
+                method_names = {
+                    'yolo_complete': 'YOLO完整识别',
+                    'hybrid_combined': '混合组合识别',
+                    'ocr_only': '仅OCR识别',
+                    'opencv_only': '仅OpenCV识别',
+                    'failed': '识别失败'
+                }
                 for method, count in method_stats.items():
                     if count > 0:
                         percentage = (count / total_recognitions) * 100
-                        print(f"  {method}: {count} 次 ({percentage:.1f}%)")
+                        method_name = method_names.get(method, method)
+                        print(f"  {method_name}: {count} 次 ({percentage:.1f}%)")
+            
+            # 显示融合策略统计
+            fusion_stats = self.stats['fusion_strategy_stats']
+            total_fusions = sum(fusion_stats.values())
+            if total_fusions > 0:
+                print(f"\n🔄 融合策略统计 (总计: {total_fusions} 次):")
+                for strategy, count in fusion_stats.items():
+                    if count > 0:
+                        percentage = (count / total_fusions) * 100
+                        print(f"  {strategy}: {count} 次 ({percentage:.1f}%)")
             
             print("=" * 40)
             
@@ -475,7 +715,7 @@ class EnhancedPokerRecognitionTester:
 def parse_arguments():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(
-        description='扑克识别系统完整测试程序',
+        description='扑克识别系统完整测试程序 (混合识别版)',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:
@@ -483,6 +723,8 @@ def parse_arguments():
   python see.py --auto             # 自动循环测试
   python see.py --count 5          # 连续测试5次
   python see.py --camera 002       # 指定摄像头ID
+  python see.py --strategy voting  # 使用投票融合策略
+  python see.py --debug            # 启用调试模式
         """
     )
     
@@ -494,6 +736,16 @@ def parse_arguments():
                        help='测试次数 (默认: 1)')
     parser.add_argument('--interval', type=int, default=5,
                        help='自动模式测试间隔(秒) (默认: 5)')
+    parser.add_argument('--strategy', choices=['weighted', 'voting', 'priority'], 
+                       default='weighted', help='融合策略 (默认: weighted)')
+    parser.add_argument('--debug', action='store_true',
+                       help='启用调试模式')
+    parser.add_argument('--no-yolo', action='store_true',
+                       help='禁用YOLO识别')
+    parser.add_argument('--no-ocr', action='store_true',
+                       help='禁用OCR识别')
+    parser.add_argument('--no-opencv', action='store_true',
+                       help='禁用OpenCV花色识别')
     
     return parser.parse_args()
 
@@ -504,6 +756,15 @@ def main():
         
         # 创建测试器
         tester = EnhancedPokerRecognitionTester()
+        
+        # 更新识别配置
+        tester.recognition_config.update({
+            'fusion_strategy': args.strategy,
+            'debug_mode': args.debug,
+            'yolo_enabled': not args.no_yolo,
+            'ocr_enabled': not args.no_ocr,
+            'opencv_suit_enabled': not args.no_opencv
+        })
         
         # 初始化系统
         if not tester.initialize():
@@ -569,7 +830,7 @@ def main():
         if tester.stats['total_tests'] > 0:
             tester.display_statistics()
         
-        print("👋 扑克识别测试系统已关闭")
+        print("👋 扑克混合识别测试系统已关闭")
         
         return 0
         
