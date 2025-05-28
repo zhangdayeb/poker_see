@@ -58,7 +58,7 @@ from src.core.utils import (
 class WebSocketPushClient:
     """WebSocket推送客户端"""
     
-    def __init__(self, server_url: str = "ws://localhost:8001", client_id: str = "python_client_001"):
+    def __init__(self, server_url: str = "ws://bjl_heguan_wss.yhyule666.com:8001", client_id: str = "python_client_001"):
         """初始化WebSocket推送客户端"""
         self.server_url = server_url
         self.client_id = client_id
