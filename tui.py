@@ -149,6 +149,8 @@ class DatabaseTuiSystem:
                 'total_writes': 0,
                 'successful_writes': 0,
                 'failed_writes': 0,
+                'total_initializations': 0,
+                'successful_initializations': 0,
                 'last_write_time': None,
                 'connection_errors': 0
             },
@@ -211,6 +213,122 @@ class DatabaseTuiSystem:
             self.stats['database_stats']['connection_errors'] += 1
             return self._init_database_connection()
     
+    def _get_table_id_from_config(self, camera_id: str) -> int:
+        """从配置文件获取tableId"""
+        try:
+            # 从启用的摄像头中查找
+            for camera in self.enabled_cameras:
+                if camera.get('id') == camera_id:
+                    table_id = camera.get('tableId', 1)  # 默认值为1
+                    return table_id
+            
+            # 如果没找到，返回默认值
+            print(f"⚠️  未找到摄像头 {camera_id} 的tableId配置，使用默认值1")
+            return 1
+            
+        except Exception as e:
+            print(f"❌ 获取tableId失败: {e}")
+            return 1
+    
+    def _camera_data_exists(self, camera_id: str, table_id: int) -> bool:
+        """检查摄像头数据是否存在"""
+        try:
+            with self.db_connection.cursor() as cursor:
+                sql = "SELECT COUNT(*) FROM tu_bjl_result WHERE camera_id = %s AND tableId = %s"
+                cursor.execute(sql, (camera_id, table_id))
+                count = cursor.fetchone()[0]
+                return count > 0
+                
+        except Exception as e:
+            print(f"❌ 检查摄像头数据存在性失败: {e}")
+            return False
+    
+    def _insert_initial_camera_data(self, camera_id: str, table_id: int) -> bool:
+        """插入摄像头的初始6条记录"""
+        try:
+            print(f"      🔧 初始化摄像头 {camera_id} 数据 (tableId: {table_id})")
+            
+            # 准备6条初始记录
+            initial_records = []
+            for position in ['t1_pl0', 't1_pl1', 't1_pl2', 't1_pr0', 't1_pr1', 't1_pr2']:
+                initial_records.append((
+                    position,
+                    '{"rank": "0", "suit": "0"}',
+                    camera_id,
+                    table_id
+                ))
+            
+            with self.db_connection.cursor() as cursor:
+                sql = "INSERT INTO tu_bjl_result (position, result, camera_id, tableId) VALUES (%s, %s, %s, %s)"
+                cursor.executemany(sql, initial_records)
+            
+            # 提交事务
+            self.db_connection.commit()
+            
+            # 更新统计
+            self.stats['database_stats']['total_initializations'] += 1
+            self.stats['database_stats']['successful_initializations'] += 1
+            
+            print(f"      ✅ 成功初始化 {len(initial_records)} 条记录")
+            return True
+            
+        except Exception as e:
+            # 回滚事务
+            if self.db_connection:
+                self.db_connection.rollback()
+            
+            print(f"      ❌ 初始化摄像头数据失败: {e}")
+            self.stats['database_stats']['total_initializations'] += 1
+            return False
+    
+    def _update_camera_results(self, camera_id: str, table_id: int, formatted_results: Dict[str, Any]) -> Dict[str, Any]:
+        """更新摄像头识别结果"""
+        try:
+            positions = formatted_results.get('positions', {})
+            updated_count = 0
+            
+            with self.db_connection.cursor() as cursor:
+                for system_position, result_data in positions.items():
+                    if system_position in self.position_mapping:
+                        db_position = self.position_mapping[system_position]
+                        
+                        # 转换数据格式
+                        rank_value = self.rank_mapping.get(result_data.get('rank', ''), 0)
+                        suit_value = self.suit_mapping.get(result_data.get('suit', ''), '0')
+                        
+                        # 构建JSON字符串
+                        result_json = json.dumps({
+                            "rank": str(rank_value),
+                            "suit": suit_value
+                        })
+                        
+                        # 执行更新，增加tableId条件
+                        sql = "UPDATE tu_bjl_result SET result = %s WHERE camera_id = %s AND tableId = %s AND position = %s"
+                        cursor.execute(sql, (result_json, camera_id, table_id, db_position))
+                        
+                        if cursor.rowcount > 0:
+                            updated_count += 1
+            
+            # 提交事务
+            self.db_connection.commit()
+            
+            return {
+                'success': True,
+                'message': f'成功更新 {updated_count} 条记录',
+                'updated_count': updated_count
+            }
+            
+        except Exception as e:
+            # 回滚事务
+            if self.db_connection:
+                self.db_connection.rollback()
+            
+            return {
+                'success': False,
+                'message': f'数据库更新失败: {str(e)}',
+                'updated_count': 0
+            }
+    
     def step1_load_camera_config(self) -> bool:
         """步骤1: 读取摄像头配置"""
         try:
@@ -239,6 +357,7 @@ class DatabaseTuiSystem:
             print(f"✅ 找到 {len(self.enabled_cameras)} 个启用的摄像头:")
             for i, camera in enumerate(self.enabled_cameras):
                 camera_id = camera['id']
+                table_id = camera.get('tableId', 1)
                 
                 # 初始化摄像头统计
                 self.stats['camera_stats'][camera_id] = {
@@ -246,10 +365,12 @@ class DatabaseTuiSystem:
                     'successful_photos': 0,
                     'successful_recognitions': 0,
                     'successful_writes': 0,
+                    'data_initialized': False,
                     'last_photo_time': None,
                     'last_recognition_time': None,
                     'last_write_time': None,
                     'last_result': None,
+                    'table_id': table_id,
                     'recognition_method_counts': {
                         'yolo_complete': 0,
                         'hybrid_combined': 0,
@@ -260,7 +381,7 @@ class DatabaseTuiSystem:
                     'quality_history': []
                 }
                 
-                print(f"   {i+1}. {camera['name']} (ID: {camera_id}) - IP: {camera['ip']}")
+                print(f"   {i+1}. {camera['name']} (ID: {camera_id}, tableId: {table_id}) - IP: {camera['ip']}")
             
             return True
             
@@ -477,11 +598,26 @@ class DatabaseTuiSystem:
                     'duration': time.time() - start_time
                 }
             
-            # 显示识别结果
-            self._display_recognition_results_table(formatted_results)
+            # 1. 从配置获取tableId
+            table_id = self._get_table_id_from_config(camera_id)
             
-            # 写入数据库
-            write_result = self._write_results_to_database(formatted_results)
+            # 2. 检查摄像头数据是否存在
+            if not self._camera_data_exists(camera_id, table_id):
+                # 3. 不存在则插入6条初始记录
+                if not self._insert_initial_camera_data(camera_id, table_id):
+                    return {
+                        'success': False,
+                        'message': '初始化摄像头数据失败',
+                        'duration': time.time() - start_time
+                    }
+                # 标记数据已初始化
+                self.stats['camera_stats'][camera_id]['data_initialized'] = True
+            
+            # 显示识别结果
+            self._display_recognition_results_table(formatted_results, table_id)
+            
+            # 4. 更新识别结果
+            write_result = self._update_camera_results(camera_id, table_id, formatted_results)
             
             duration = time.time() - start_time
             
@@ -510,60 +646,13 @@ class DatabaseTuiSystem:
                 'duration': 0
             }
     
-    def _write_results_to_database(self, formatted_results: Dict[str, Any]) -> Dict[str, Any]:
-        """执行数据库写入操作"""
-        try:
-            positions = formatted_results.get('positions', {})
-            updated_count = 0
-            
-            with self.db_connection.cursor() as cursor:
-                for system_position, result_data in positions.items():
-                    if system_position in self.position_mapping:
-                        db_position = self.position_mapping[system_position]
-                        
-                        # 转换数据格式
-                        rank_value = self.rank_mapping.get(result_data.get('rank', ''), 0)
-                        suit_value = self.suit_mapping.get(result_data.get('suit', ''), '0')
-                        
-                        # 构建JSON字符串
-                        result_json = json.dumps({
-                            "rank": str(rank_value),
-                            "suit": suit_value
-                        })
-                        
-                        # 执行更新
-                        sql = "UPDATE tu_bjl_result SET result = %s WHERE position = %s"
-                        cursor.execute(sql, (result_json, db_position))
-                        
-                        if cursor.rowcount > 0:
-                            updated_count += 1
-            
-            # 提交事务
-            self.db_connection.commit()
-            
-            return {
-                'success': True,
-                'message': f'成功更新 {updated_count} 条记录',
-                'updated_count': updated_count
-            }
-            
-        except Exception as e:
-            # 回滚事务
-            if self.db_connection:
-                self.db_connection.rollback()
-            
-            return {
-                'success': False,
-                'message': f'数据库写入失败: {str(e)}',
-                'updated_count': 0
-            }
-    
-    def _display_recognition_results_table(self, formatted_results: Dict[str, Any]):
+    def _display_recognition_results_table(self, formatted_results: Dict[str, Any], table_id: int):
         """以表格形式显示识别结果"""
         with self.display_lock:
             positions = formatted_results.get('positions', {})
+            camera_id = formatted_results.get('camera_id', '')
             
-            print("      📊 识别结果展示:")
+            print(f"      📊 识别结果展示 (camera_id: {camera_id}, tableId: {table_id}):")
             print("      ┌─────────┬─────────┬────────┬─────────┬──────────┐")
             print("      │ 位置    │ 系统结果│ 数据库位置│ 转换结果│ 置信度   │")
             print("      ├─────────┼─────────┼────────┼─────────┼──────────┤")
@@ -991,7 +1080,7 @@ class DatabaseTuiSystem:
             # 显示数据库统计
             db_stats = self.stats['database_stats']
             db_success_rate = (db_stats['successful_writes'] / db_stats['total_writes'] * 100) if db_stats['total_writes'] > 0 else 0
-            print(f"   🗄️  数据库: 总写入{db_stats['total_writes']} 成功{db_stats['successful_writes']} 失败{db_stats['failed_writes']} 成功率{db_success_rate:.1f}% 连接错误{db_stats['connection_errors']}")
+            print(f"   🗄️  数据库: 总写入{db_stats['total_writes']} 成功{db_stats['successful_writes']} 失败{db_stats['failed_writes']} 成功率{db_success_rate:.1f}% 初始化{db_stats['successful_initializations']} 连接错误{db_stats['connection_errors']}")
             
             # 显示各摄像头状态
             for camera_id, stats in self.stats['camera_stats'].items():
@@ -1000,6 +1089,8 @@ class DatabaseTuiSystem:
                 success_icon = "✅" if stats['successful_recognitions'] > 0 else "⚪"
                 last_time = stats.get('last_recognition_time', '未知')
                 avg_quality = stats.get('average_quality_score', 0)
+                table_id = stats.get('table_id', 1)
+                init_status = "✓" if stats.get('data_initialized', False) else "○"
                 
                 # 识别方法统计
                 method_counts = stats['recognition_method_counts']
@@ -1007,7 +1098,7 @@ class DatabaseTuiSystem:
                 
                 print(f"   {success_icon} {camera_name}: 拍照{stats['successful_photos']}/{stats['total_attempts']} "
                       f"识别{stats['successful_recognitions']} 写入{stats['successful_writes']} "
-                      f"质量{avg_quality:.2f} 方法[{method_str}] 最后:{last_time}")
+                      f"质量{avg_quality:.2f} 方法[{method_str}] 表ID{table_id} 初始化{init_status} 最后:{last_time}")
     
     def _display_waiting(self, wait_time: float):
         """显示等待信息"""
@@ -1033,6 +1124,7 @@ class DatabaseTuiSystem:
                 print(f"  总写入次数: {db_stats['total_writes']}")
                 print(f"  成功写入: {db_stats['successful_writes']} ({db_success_rate:.1f}%)")
                 print(f"  失败写入: {db_stats['failed_writes']}")
+                print(f"  数据初始化: {db_stats['successful_initializations']}/{db_stats['total_initializations']}")
                 print(f"  连接错误: {db_stats['connection_errors']}")
                 print(f"  最后写入: {db_stats['last_write_time'] or '无'}")
             
@@ -1078,10 +1170,11 @@ class DatabaseTuiSystem:
                 
                 photo_rate = (stats['successful_photos'] / stats['total_attempts'] * 100) if stats['total_attempts'] > 0 else 0
                 
-                print(f"   {camera_name} (ID: {camera_id}):")
+                print(f"   {camera_name} (ID: {camera_id}, tableId: {stats.get('table_id', 1)}):")
                 print(f"     拍照: {stats['successful_photos']}/{stats['total_attempts']} ({photo_rate:.1f}%)")
                 print(f"     识别: {stats['successful_recognitions']} 次成功")
                 print(f"     写入: {stats['successful_writes']} 次成功")
+                print(f"     数据初始化: {'是' if stats.get('data_initialized', False) else '否'}")
                 print(f"     平均质量: {stats['average_quality_score']:.3f}")
                 
                 # 识别方法分布
