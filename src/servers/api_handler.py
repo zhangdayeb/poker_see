@@ -8,7 +8,7 @@ API统一处理模块 - 整合所有业务模块，提供RESTful API接口
 3. 响应格式统一
 4. 错误处理和日志记录
 5. 集成所有业务模块
-6. 推送功能API接口
+6. WebSocket推送功能API接口
 """
 
 import sys
@@ -81,11 +81,11 @@ except ImportError as e:
     static_handler_available = False
 
 try:
-    from src.clients import websocket_client, http_client
-    push_clients_available = True
+    from src.clients import websocket_client
+    websocket_client_available = True
 except ImportError as e:
-    print(f"Warning: Could not import push clients: {e}")
-    push_clients_available = False
+    print(f"Warning: Could not import websocket_client: {e}")
+    websocket_client_available = False
 
 # 创建安全的模块接口
 class SafeModuleInterface:
@@ -145,6 +145,10 @@ class SafeModuleInterface:
                 return recognition_manager.get_push_config()
             elif func_name == 'get_push_status' and recognition_manager_available:
                 return recognition_manager.get_push_status()
+            elif func_name == 'get_system_statistics' and recognition_manager_available:
+                return recognition_manager.get_system_statistics()
+            elif func_name == 'cleanup_old_history' and recognition_manager_available:
+                return recognition_manager.cleanup_old_history(*args)
             
             else:
                 return format_error_response(
@@ -180,11 +184,11 @@ class APIHandler:
                 '/api/marks/statistics': self._handle_get_mark_statistics,
                 '/api/config/status': self._handle_get_config_status,
                 '/api/system/info': self._handle_get_system_info,
-                # 推送相关GET接口
+                '/api/system/statistics': self._handle_get_system_statistics,
+                # WebSocket推送相关GET接口
                 '/api/push/config': self._handle_get_push_config,
                 '/api/push/status': self._handle_get_push_status,
                 '/api/push/clients/websocket/status': self._handle_get_websocket_client_status,
-                '/api/push/clients/http/status': self._handle_get_http_client_status,
             },
             # POST路由
             'POST': {
@@ -196,13 +200,13 @@ class APIHandler:
                 '/api/camera/{id}/update': self._handle_update_camera,
                 '/api/marks/validate': self._handle_validate_marks,
                 '/api/photos/cleanup': self._handle_cleanup_photos,
-                # 推送相关POST接口
+                '/api/history/cleanup': self._handle_cleanup_history,
+                # WebSocket推送相关POST接口
                 '/api/push/config': self._handle_update_push_config,
                 '/api/push/manual': self._handle_manual_push,
                 '/api/push/clients/websocket/start': self._handle_start_websocket_client,
                 '/api/push/clients/websocket/stop': self._handle_stop_websocket_client,
                 '/api/push/clients/websocket/heartbeat': self._handle_websocket_heartbeat,
-                '/api/push/clients/http/test': self._handle_test_http_servers,
             },
             # PUT路由
             'PUT': {
@@ -379,7 +383,7 @@ class APIHandler:
             "系统信息获取成功",
             data={
                 'system_name': '扑克识别系统',
-                'version': '2.0',
+                'version': '2.1',
                 'api_version': '1.0',
                 'timestamp': get_timestamp(),
                 'module_status': {
@@ -388,7 +392,7 @@ class APIHandler:
                     'photo_controller': photo_controller_available,
                     'recognition_manager': recognition_manager_available,
                     'static_handler': static_handler_available,
-                    'push_clients': push_clients_available
+                    'websocket_client': websocket_client_available
                 },
                 'available_endpoints': {
                     'GET': list(self.routes['GET'].keys()),
@@ -399,7 +403,11 @@ class APIHandler:
             }
         )
     
-    # ==================== 推送相关GET路由处理器 ====================
+    def _handle_get_system_statistics(self, **kwargs) -> Dict[str, Any]:
+        """获取系统统计信息"""
+        return safe_interface.safe_call(recognition_manager_available, 'get_system_statistics')
+    
+    # ==================== WebSocket推送相关GET路由处理器 ====================
     
     def _handle_get_push_config(self, **kwargs) -> Dict[str, Any]:
         """获取推送配置"""
@@ -411,26 +419,14 @@ class APIHandler:
     
     def _handle_get_websocket_client_status(self, **kwargs) -> Dict[str, Any]:
         """获取WebSocket客户端状态"""
-        if not push_clients_available:
-            return format_error_response("推送客户端模块不可用", "PUSH_CLIENTS_NOT_AVAILABLE")
+        if not websocket_client_available:
+            return format_error_response("WebSocket客户端模块不可用", "WEBSOCKET_CLIENT_NOT_AVAILABLE")
         
         try:
             from src.clients.websocket_client import get_push_client_status
             return get_push_client_status()
         except Exception as e:
             return format_error_response(f"获取WebSocket客户端状态失败: {str(e)}", "GET_WS_STATUS_ERROR")
-    
-    def _handle_get_http_client_status(self, **kwargs) -> Dict[str, Any]:
-        """获取HTTP客户端状态"""
-        if not push_clients_available:
-            return format_error_response("推送客户端模块不可用", "PUSH_CLIENTS_NOT_AVAILABLE")
-        
-        try:
-            from src.clients.http_client import HTTPPushClient
-            http_client = HTTPPushClient()
-            return http_client.get_client_status()
-        except Exception as e:
-            return format_error_response(f"获取HTTP客户端状态失败: {str(e)}", "GET_HTTP_STATUS_ERROR")
     
     # ==================== POST 路由处理器 ====================
     
@@ -513,7 +509,13 @@ class APIHandler:
         
         return safe_interface.safe_call(photo_controller_available, 'cleanup_old_photos', keep_count, camera_id)
     
-    # ==================== 推送相关POST路由处理器 ====================
+    def _handle_cleanup_history(self, request_data: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+        """清理历史记录"""
+        keep_count = request_data.get('keep_count', 50) if request_data else 50
+        
+        return safe_interface.safe_call(recognition_manager_available, 'cleanup_old_history', keep_count)
+    
+    # ==================== WebSocket推送相关POST路由处理器 ====================
     
     def _handle_update_push_config(self, request_data: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """更新推送配置"""
@@ -524,15 +526,15 @@ class APIHandler:
     
     def _handle_manual_push(self, request_data: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """手动推送识别结果"""
-        push_type = request_data.get('push_type', 'both') if request_data else 'both'
+        push_type = request_data.get('push_type', 'websocket') if request_data else 'websocket'
         camera_id = request_data.get('camera_id') if request_data else None
         
         return safe_interface.safe_call(recognition_manager_available, 'manual_push_recognition_result', push_type, camera_id)
     
     def _handle_start_websocket_client(self, request_data: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """启动WebSocket推送客户端"""
-        if not push_clients_available:
-            return format_error_response("推送客户端模块不可用", "PUSH_CLIENTS_NOT_AVAILABLE")
+        if not websocket_client_available:
+            return format_error_response("WebSocket客户端模块不可用", "WEBSOCKET_CLIENT_NOT_AVAILABLE")
         
         try:
             from src.clients.websocket_client import start_push_client
@@ -546,8 +548,8 @@ class APIHandler:
     
     def _handle_stop_websocket_client(self, **kwargs) -> Dict[str, Any]:
         """停止WebSocket推送客户端"""
-        if not push_clients_available:
-            return format_error_response("推送客户端模块不可用", "PUSH_CLIENTS_NOT_AVAILABLE")
+        if not websocket_client_available:
+            return format_error_response("WebSocket客户端模块不可用", "WEBSOCKET_CLIENT_NOT_AVAILABLE")
         
         try:
             from src.clients.websocket_client import stop_push_client
@@ -557,8 +559,8 @@ class APIHandler:
     
     def _handle_websocket_heartbeat(self, **kwargs) -> Dict[str, Any]:
         """发送WebSocket心跳"""
-        if not push_clients_available:
-            return format_error_response("推送客户端模块不可用", "PUSH_CLIENTS_NOT_AVAILABLE")
+        if not websocket_client_available:
+            return format_error_response("WebSocket客户端模块不可用", "WEBSOCKET_CLIENT_NOT_AVAILABLE")
         
         try:
             from src.clients.websocket_client import push_client
@@ -569,28 +571,13 @@ class APIHandler:
         except Exception as e:
             return format_error_response(f"发送心跳失败: {str(e)}", "HEARTBEAT_ERROR")
     
-    def _handle_test_http_servers(self, request_data: Dict[str, Any], **kwargs) -> Dict[str, Any]:
-        """测试HTTP服务器连接"""
-        if not push_clients_available:
-            return format_error_response("推送客户端模块不可用", "PUSH_CLIENTS_NOT_AVAILABLE")
-        
-        try:
-            from src.clients.http_client import HTTPPushClient
-            
-            server_urls = request_data.get('server_urls', ['http://localhost:8080/api/recognition_result']) if request_data else ['http://localhost:8080/api/recognition_result']
-            
-            http_client = HTTPPushClient(server_urls)
-            return http_client.test_servers()
-        except Exception as e:
-            return format_error_response(f"测试HTTP服务器失败: {str(e)}", "TEST_HTTP_ERROR")
-    
     def get_api_documentation(self) -> Dict[str, Any]:
         """获取API文档"""
         docs = {
             'api_info': {
                 'name': '扑克识别系统 API',
                 'version': '1.0',
-                'description': '提供摄像头配置、标记管理、拍照控制、识别结果处理和推送功能的完整API接口'
+                'description': '提供摄像头配置、标记管理、拍照控制、识别结果处理和WebSocket推送功能的完整API接口'
             },
             'endpoints': {}
         }
@@ -608,12 +595,12 @@ class APIHandler:
             'GET /api/marks/statistics': '获取标记统计信息',
             'GET /api/config/status': '获取配置文件状态',
             'GET /api/system/info': '获取系统信息',
+            'GET /api/system/statistics': '获取系统统计信息',
             
-            # 推送相关GET接口
+            # WebSocket推送相关GET接口
             'GET /api/push/config': '获取推送配置',
             'GET /api/push/status': '获取推送状态',
             'GET /api/push/clients/websocket/status': '获取WebSocket客户端状态',
-            'GET /api/push/clients/http/status': '获取HTTP客户端状态',
             
             # POST接口
             'POST /api/recognition_result': '接收识别结果数据',
@@ -623,14 +610,14 @@ class APIHandler:
             'POST /api/camera/add': '添加新摄像头',
             'POST /api/marks/validate': '验证标记数据格式',
             'POST /api/photos/cleanup': '清理旧图片文件',
+            'POST /api/history/cleanup': '清理识别历史记录',
             
-            # 推送相关POST接口
+            # WebSocket推送相关POST接口
             'POST /api/push/config': '更新推送配置',
             'POST /api/push/manual': '手动推送识别结果',
             'POST /api/push/clients/websocket/start': '启动WebSocket推送客户端',
             'POST /api/push/clients/websocket/stop': '停止WebSocket推送客户端',
             'POST /api/push/clients/websocket/heartbeat': '发送WebSocket心跳',
-            'POST /api/push/clients/http/test': '测试HTTP服务器连接',
             
             # PUT接口
             'PUT /api/camera/{id}': '更新摄像头信息',
@@ -672,7 +659,7 @@ def list_api_routes() -> Dict[str, Any]:
 
 if __name__ == "__main__":
     # 测试API处理器
-    print("🧪 测试API处理器（集成推送功能）")
+    print("🧪 测试API处理器（WebSocket推送版）")
     
     # 测试GET请求
     print("\n📋 测试GET请求")
@@ -689,6 +676,10 @@ if __name__ == "__main__":
     result = handle_api_request('GET', '/api/system/info')
     print(f"GET /api/system/info: {result['status']}")
     
+    # 测试系统统计
+    result = handle_api_request('GET', '/api/system/statistics')
+    print(f"GET /api/system/statistics: {result['status']}")
+    
     # 测试推送配置
     result = handle_api_request('GET', '/api/push/config')
     print(f"GET /api/push/config: {result['status']}")
@@ -696,6 +687,10 @@ if __name__ == "__main__":
     # 测试推送状态
     result = handle_api_request('GET', '/api/push/status')
     print(f"GET /api/push/status: {result['status']}")
+    
+    # 测试WebSocket客户端状态
+    result = handle_api_request('GET', '/api/push/clients/websocket/status')
+    print(f"GET /api/push/clients/websocket/status: {result['status']}")
     
     # 测试POST请求
     print("\n📤 测试POST请求")
@@ -715,9 +710,22 @@ if __name__ == "__main__":
     print(f"POST /api/camera/001/marks: {result['status']}")
     
     # 测试手动推送
-    push_data = json.dumps({'push_type': 'both', 'camera_id': '001'}).encode('utf-8')
+    push_data = json.dumps({'push_type': 'websocket', 'camera_id': '001'}).encode('utf-8')
     result = handle_api_request('POST', '/api/push/manual', post_data=push_data)
     print(f"POST /api/push/manual: {result['status']}")
+    
+    # 测试启动WebSocket客户端
+    ws_data = json.dumps({
+        'server_url': 'ws://localhost:8001',
+        'client_id': 'test_client_001'
+    }).encode('utf-8')
+    result = handle_api_request('POST', '/api/push/clients/websocket/start', post_data=ws_data)
+    print(f"POST /api/push/clients/websocket/start: {result['status']}")
+    
+    # 测试清理历史记录
+    cleanup_data = json.dumps({'keep_count': 20}).encode('utf-8')
+    result = handle_api_request('POST', '/api/history/cleanup', post_data=cleanup_data)
+    print(f"POST /api/history/cleanup: {result['status']}")
     
     # 测试API文档
     print("\n📚 测试API文档")

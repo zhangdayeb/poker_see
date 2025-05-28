@@ -28,21 +28,6 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import websocket_client module: {e}")
 
-# 尝试导入 HTTP 推送客户端
-try:
-    from .http_client import (
-        HTTPPushClient,
-        push_via_http
-    )
-    
-    __all__.extend([
-        'HTTPPushClient',
-        'push_via_http'
-    ])
-    
-except ImportError as e:
-    print(f"Warning: Could not import http_client module: {e}")
-
 # 如果没有任何模块可导入
 if not __all__:
     print("Warning: No push client modules could be imported")
