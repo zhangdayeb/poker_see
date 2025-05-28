@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-扑克识别系统完整测试程序 - see.py (无OCR版本)
+扑克识别系统完整测试程序 - see.py (增强版)
 功能:
-1. 直接读取配置文件（修复路径问题）
+1. 使用统一配置加载器
 2. 拍照
 3. 裁剪图片
-4. 识别扑克牌 (仅使用YOLO)
-5. 展示结果
+4. 混合识别扑克牌 (YOLO + OCR + OpenCV)
+5. 结果合并和分析
+6. 展示详细结果
 """
 
 import sys
@@ -17,13 +18,12 @@ import argparse
 from pathlib import Path
 from typing import Dict, Any, List
 
-# 重点修改1: 简化路径设置，直接使用当前目录结构
+# 设置项目路径
 def setup_project_paths():
-    """设置项目路径 - 简化版本"""
+    """设置项目路径"""
     current_file = Path(__file__).resolve()
     project_root = current_file.parent
     
-    # 将项目根目录添加到Python路径
     project_root_str = str(project_root)
     if project_root_str not in sys.path:
         sys.path.insert(0, project_root_str)
@@ -32,26 +32,30 @@ def setup_project_paths():
 
 PROJECT_ROOT = setup_project_paths()
 
-class PokerRecognitionTester:
-    """扑克识别系统测试器"""
+class EnhancedPokerRecognitionTester:
+    """增强版扑克识别系统测试器"""
     
     def __init__(self):
         """初始化测试器"""
         self.selected_camera_id = None
         self.camera_config = None
         
-        # 重点修改2: 直接设置配置文件路径
-        self.config_file = PROJECT_ROOT / "src" / "config" / "camera.json"
-        
         # 统计信息
         self.stats = {
             'total_tests': 0,
             'successful_tests': 0,
             'failed_tests': 0,
-            'start_time': time.time()
+            'start_time': time.time(),
+            'recognition_method_stats': {
+                'yolo_only': 0,
+                'hybrid': 0,
+                'ocr_only': 0,
+                'opencv_only': 0,
+                'failed': 0
+            }
         }
         
-        print("🎮 扑克识别系统测试器初始化完成 (仅YOLO模式)")
+        print("🎮 增强版扑克识别系统测试器初始化完成")
     
     def initialize(self) -> bool:
         """初始化系统"""
@@ -59,38 +63,80 @@ class PokerRecognitionTester:
             print("🚀 初始化扑克识别测试系统...")
             print("=" * 60)
             
-            # 重点修改3: 直接验证配置文件路径
-            print(f"🔍 验证配置文件: {self.config_file}")
+            # 检查各个模块的可用性
+            self._check_module_availability()
             
-            if not self.config_file.exists():
-                print(f"❌ 配置文件不存在: {self.config_file}")
-                return False
-            
-            print("✅ 配置文件存在")
-            print("ℹ️  注意: 当前版本仅使用YOLO识别，不支持OCR功能")
             return True
             
         except Exception as e:
             print(f"❌ 系统初始化失败: {e}")
             return False
     
-    def step1_read_cameras(self) -> bool:
-        """步骤1: 读取摄像头配置 - 重点修改4: 直接读取JSON文件"""
+    def _check_module_availability(self):
+        """检查模块可用性"""
+        print("🔍 检查模块可用性:")
+        
+        # 检查配置加载器
         try:
-            print("\n📷 步骤1: 读取摄像头配置")
-            print("-" * 40)
+            from src.core.config_loader import validate_all_configs
+            config_result = validate_all_configs()
+            print(f"   配置管理器: {'✅ 可用' if config_result['status'] == 'success' else '⚠️  有问题'}")
+            if config_result['status'] != 'success':
+                print(f"      问题: {config_result.get('message', '未知')}")
+        except ImportError as e:
+            print(f"   配置管理器: ❌ 导入失败 - {e}")
+        
+        # 检查拍照控制器
+        try:
+            from src.processors.photo_controller import take_photo_by_id
+            print("   拍照控制器: ✅ 可用")
+        except ImportError as e:
+            print(f"   拍照控制器: ❌ 导入失败 - {e}")
+        
+        # 检查图片裁剪器
+        try:
+            from src.processors.image_cutter import process_image
+            print("   图片裁剪器: ✅ 可用")
+        except ImportError as e:
+            print(f"   图片裁剪器: ❌ 导入失败 - {e}")
+        
+        # 检查混合识别器
+        try:
+            from src.processors.poker_hybrid_recognizer import get_hybrid_recognition_capabilities
+            capabilities = get_hybrid_recognition_capabilities()
+            print("   混合识别器: ✅ 可用")
             
-            # 直接读取配置文件
-            with open(self.config_file, 'r', encoding='utf-8') as f:
-                self.camera_config = json.load(f)
+            # 显示识别能力详情
+            available_methods = capabilities['available_methods']
+            print("   识别方法可用性:")
+            for method, available in available_methods.items():
+                status = "✅" if available else "❌"
+                print(f"     {method}: {status}")
+        except ImportError as e:
+            print(f"   混合识别器: ❌ 导入失败 - {e}")
+        
+        # 检查结果合并器
+        try:
+            from src.processors.poker_result_merger import merge_poker_recognition_results
+            print("   结果合并器: ✅ 可用")
+        except ImportError as e:
+            print(f"   结果合并器: ❌ 导入失败 - {e}")
+    
+    def step1_load_camera_config(self) -> bool:
+        """步骤1: 使用统一配置加载器读取摄像头配置"""
+        try:
+            print("\n📷 步骤1: 读取摄像头配置 (使用统一配置加载器)")
+            print("-" * 50)
             
-            cameras = self.camera_config.get('cameras', [])
-            if not cameras:
-                print("❌ 没有找到摄像头配置")
+            # 使用统一配置加载器
+            from src.core.config_loader import get_enabled_cameras
+            
+            result = get_enabled_cameras()
+            if result['status'] != 'success':
+                print(f"❌ 获取摄像头配置失败: {result['message']}")
                 return False
             
-            # 过滤启用的摄像头
-            enabled_cameras = [c for c in cameras if c.get('enabled', True)]
+            enabled_cameras = result['data']['cameras']
             if not enabled_cameras:
                 print("❌ 没有找到启用的摄像头")
                 return False
@@ -111,30 +157,16 @@ class PokerRecognitionTester:
             print(f"   端口: {selected_camera['port']}")
             print(f"   流路径: {selected_camera['stream_path']}")
             
+            # 检查标记位置
+            mark_positions = selected_camera.get('mark_positions', {})
+            marked_positions = [pos for pos, data in mark_positions.items() if data.get('marked', False)]
+            print(f"   已标记位置: {len(marked_positions)} 个 ({', '.join(marked_positions)})")
+            
             return True
             
         except Exception as e:
             print(f"❌ 读取摄像头配置异常: {e}")
             return False
-    
-    def get_camera_by_id(self, camera_id: str) -> Dict[str, Any]:
-        """根据ID获取摄像头配置 - 重点修改5: 本地实现"""
-        try:
-            if not self.camera_config:
-                return {'status': 'error', 'message': '配置未加载'}
-            
-            cameras = self.camera_config.get('cameras', [])
-            for camera in cameras:
-                if camera.get('id') == camera_id:
-                    return {
-                        'status': 'success', 
-                        'data': {'camera': camera}
-                    }
-            
-            return {'status': 'error', 'message': f'摄像头 {camera_id} 不存在'}
-            
-        except Exception as e:
-            return {'status': 'error', 'message': str(e)}
     
     def step2_take_photo(self) -> Dict[str, Any]:
         """步骤2: 拍照"""
@@ -146,7 +178,6 @@ class PokerRecognitionTester:
                 print("❌ 未选择摄像头")
                 return {'success': False, 'error': '未选择摄像头'}
             
-            # 导入拍照控制器
             from src.processors.photo_controller import take_photo_by_id
             
             print(f"正在拍照 (摄像头: {self.selected_camera_id})...")
@@ -192,7 +223,6 @@ class PokerRecognitionTester:
             print("\n✂️  步骤3: 裁剪图片")
             print("-" * 40)
             
-            # 导入图片裁剪器
             from src.processors.image_cutter import process_image
             
             print(f"正在裁剪图片: {Path(image_path).name}")
@@ -209,31 +239,29 @@ class PokerRecognitionTester:
                 cut_dir = image_file.parent / "cut"
                 
                 if cut_dir.exists():
-                    # 查找所有裁剪后的图片，但不包括左上角图片（因为不需要OCR）
                     pattern = f"{image_file.stem}_*.png"
                     all_files = list(cut_dir.glob(pattern))
                     
-                    # 过滤掉左上角图片（_left.png）
-                    cropped_files = [f for f in all_files if not f.name.endswith('_left.png')]
+                    # 分离主图片和左上角图片
+                    main_files = [f for f in all_files if not f.name.endswith('_left.png')]
+                    left_files = [f for f in all_files if f.name.endswith('_left.png')]
                     
-                    # 按文件名排序
-                    cropped_files.sort(key=lambda x: x.name)
+                    main_files.sort(key=lambda x: x.name)
+                    left_files.sort(key=lambda x: x.name)
                     
-                    print(f"   生成裁剪图片: {len(cropped_files)} 个 (已排除左上角图片)")
-                    for i, crop_file in enumerate(cropped_files):
+                    print(f"   生成主图片: {len(main_files)} 个")
+                    for i, crop_file in enumerate(main_files):
                         file_size = crop_file.stat().st_size
                         print(f"   {i+1}. {crop_file.name} ({file_size} bytes)")
                     
-                    # 显示被排除的左上角图片
-                    left_files = [f for f in all_files if f.name.endswith('_left.png')]
-                    if left_files:
-                        print(f"   排除左上角图片: {len(left_files)} 个 (无需OCR)")
+                    print(f"   生成左上角图片: {len(left_files)} 个")
                     
                     return {
                         'success': True,
-                        'cropped_files': [str(f) for f in cropped_files],
+                        'main_files': [str(f) for f in main_files],
+                        'left_files': [str(f) for f in left_files],
                         'cut_dir': str(cut_dir),
-                        'count': len(cropped_files)
+                        'total_count': len(all_files)
                     }
                 else:
                     print("❌ 裁剪目录不存在")
@@ -246,35 +274,58 @@ class PokerRecognitionTester:
             print(f"❌ 裁剪图片异常: {e}")
             return {'success': False, 'error': str(e)}
     
-    def step4_recognize_images(self, cropped_files: List[str]) -> Dict[str, Any]:
-        """步骤4: 识别扑克牌 (仅使用YOLO)"""
+    def step4_hybrid_recognition(self, main_files: List[str], left_files: List[str]) -> Dict[str, Any]:
+        """步骤4: 混合识别扑克牌"""
         try:
-            print("\n🧠 步骤4: 识别扑克牌 (仅YOLO模式)")
-            print("-" * 40)
+            print("\n🧠 步骤4: 混合识别扑克牌 (YOLO + OCR + OpenCV)")
+            print("-" * 50)
             
-            recognition_results = {}
+            from src.processors.poker_hybrid_recognizer import recognize_poker_card_hybrid
+            
+            position_results = {}
             successful_count = 0
-            total_count = len(cropped_files)
+            total_count = len(main_files)
             
             print(f"开始识别 {total_count} 个图片区域...")
             
-            for i, image_path in enumerate(cropped_files):
-                image_file = Path(image_path)
-                position = self._extract_position_from_filename(image_file.name)
+            for i, main_image_path in enumerate(main_files):
+                main_image_file = Path(main_image_path)
+                position = self._extract_position_from_filename(main_image_file.name)
+                
+                # 查找对应的左上角图片
+                left_image_path = self._find_corresponding_left_image(main_image_path, left_files)
                 
                 print(f"\n   ({i+1}/{total_count}) 识别位置: {position}")
-                print(f"   文件: {image_file.name}")
+                print(f"   主图片: {main_image_file.name}")
+                if left_image_path:
+                    print(f"   左上角图片: {Path(left_image_path).name}")
+                else:
+                    print("   左上角图片: 未找到")
                 
-                # 仅使用YOLO识别
-                result = self._recognize_with_yolo_only(image_path)
+                # 使用混合识别器
+                result = recognize_poker_card_hybrid(main_image_path, left_image_path)
                 
                 if result['success']:
                     print(f"   ✅ {result['display_name']} (置信度: {result.get('confidence', 0):.3f})")
+                    print(f"      方法: {result['hybrid_info']['used_methods']}")
+                    print(f"      耗时: {result.get('recognition_duration', 0):.2f}s")
                     successful_count += 1
+                    
+                    # 统计识别方法
+                    used_methods = result['hybrid_info']['used_methods']
+                    if 'yolo' in used_methods and len(used_methods) == 1:
+                        self.stats['recognition_method_stats']['yolo_only'] += 1
+                    elif len(used_methods) > 1:
+                        self.stats['recognition_method_stats']['hybrid'] += 1
+                    elif 'ocr' in used_methods:
+                        self.stats['recognition_method_stats']['ocr_only'] += 1
+                    elif 'opencv_suit' in used_methods:
+                        self.stats['recognition_method_stats']['opencv_only'] += 1
                 else:
                     print(f"   ❌ 识别失败: {result.get('error', '未知错误')}")
+                    self.stats['recognition_method_stats']['failed'] += 1
                 
-                recognition_results[position] = result
+                position_results[position] = result
             
             success_rate = (successful_count / total_count * 100) if total_count > 0 else 0
             
@@ -284,7 +335,7 @@ class PokerRecognitionTester:
             
             return {
                 'success': True,
-                'results': recognition_results,
+                'position_results': position_results,
                 'successful_count': successful_count,
                 'total_count': total_count,
                 'success_rate': success_rate
@@ -294,56 +345,155 @@ class PokerRecognitionTester:
             print(f"❌ 识别异常: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _recognize_with_yolo_only(self, image_path: str) -> Dict[str, Any]:
-        """仅使用YOLO识别扑克牌"""
+    def step5_merge_results(self, position_results: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """步骤5: 合并和分析结果"""
         try:
-            # 仅使用YOLO识别
-            yolo_result = self._recognize_with_yolo(image_path)
+            print("\n🔗 步骤5: 合并和分析结果")
+            print("-" * 40)
             
-            if yolo_result['success']:
-                yolo_result['method'] = 'yolo'
-                return yolo_result
-            else:
-                return {
-                    'success': False,
-                    'error': yolo_result.get('error', 'YOLO识别失败'),
-                    'method': 'yolo_failed'
-                }
-                
-        except Exception as e:
-            return {
-                'success': False,
-                'error': f'识别异常: {str(e)}',
-                'method': 'exception'
+            from src.processors.poker_result_merger import merge_poker_recognition_results
+            
+            # 使用结果合并器
+            merge_config = {
+                'include_quality_metrics': True,
+                'include_debug_info': True,
+                'enable_consistency_check': True,
+                'duplicate_detection_enabled': True
             }
-    
-    def _recognize_with_yolo(self, image_path: str) -> Dict[str, Any]:
-        """使用YOLO识别"""
-        try:
-            from src.processors.poker_recognizer import recognize_poker_card
             
-            result = recognize_poker_card(image_path)
+            start_time = time.time()
+            merged_result = merge_poker_recognition_results(
+                position_results,
+                camera_id=self.selected_camera_id,
+                metadata={'test_mode': True, 'tester': 'see.py'},
+                config=merge_config
+            )
+            duration = time.time() - start_time
             
-            if result['success']:
+            if merged_result['success']:
+                print(f"✅ 结果合并成功! (耗时: {duration:.3f}s)")
+                
+                # 显示合并统计
+                summary = merged_result['summary']
+                print(f"   成功位置: {summary['successful_positions']}/{summary['total_positions']}")
+                print(f"   成功率: {summary['success_rate']:.1%}")
+                print(f"   识别卡牌: {', '.join(summary['recognized_cards'])}")
+                
+                # 显示质量评估
+                if 'quality' in merged_result:
+                    quality = merged_result['quality']
+                    print(f"   质量等级: {quality['quality_level']} (评分: {quality['quality_score']:.3f})")
+                    
+                    if quality.get('suggestions'):
+                        print(f"   建议: {'; '.join(quality['suggestions'])}")
+                
+                # 显示警告
+                if 'warnings' in merged_result:
+                    print(f"   ⚠️  警告: {'; '.join(merged_result['warnings'])}")
+                
                 return {
                     'success': True,
-                    'suit': result['suit'],
-                    'rank': result['rank'],
-                    'suit_symbol': result.get('suit_symbol', ''),
-                    'display_name': result['display_name'],
-                    'confidence': result['confidence']
+                    'merged_result': merged_result
                 }
             else:
-                return {
-                    'success': False,
-                    'error': result['error']
-                }
+                print(f"❌ 结果合并失败: {merged_result.get('message', '未知错误')}")
+                return {'success': False, 'error': merged_result.get('message', '未知错误')}
                 
         except Exception as e:
-            return {
-                'success': False,
-                'error': f'YOLO识别异常: {str(e)}'
+            print(f"❌ 结果合并异常: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def step6_display_detailed_results(self, merged_result: Dict[str, Any]):
+        """步骤6: 展示详细结果"""
+        try:
+            print("\n📊 步骤6: 详细结果展示")
+            print("=" * 60)
+            
+            positions = merged_result.get('positions', {})
+            
+            # 位置名称映射
+            position_names = {
+                'zhuang_1': '庄家1', 'zhuang_2': '庄家2', 'zhuang_3': '庄家3',
+                'xian_1': '闲家1', 'xian_2': '闲家2', 'xian_3': '闲家3'
             }
+            
+            print("🎴 各位置识别详情:")
+            print("-" * 60)
+            
+            # 按位置顺序显示
+            standard_positions = ['zhuang_1', 'zhuang_2', 'zhuang_3', 'xian_1', 'xian_2', 'xian_3']
+            
+            for position in standard_positions:
+                position_name = position_names.get(position, position)
+                
+                if position in positions:
+                    result = positions[position]
+                    
+                    if result.get('success', False):
+                        display_name = result.get('display_name', 'N/A')
+                        confidence = result.get('confidence', 0)
+                        method = result.get('method', 'unknown')
+                        duration = result.get('recognition_duration', 0)
+                        
+                        status_icon = "✅"
+                        status_text = f"{display_name} (置信度: {confidence:.3f}, 方法: {method}, 耗时: {duration:.2f}s)"
+                        
+                        # 显示混合识别详情
+                        if 'hybrid_info' in result:
+                            hybrid_info = result['hybrid_info']
+                            used_methods = hybrid_info.get('used_methods', [])
+                            fusion_strategy = hybrid_info.get('fusion_strategy', '')
+                            status_text += f"\n          融合策略: {fusion_strategy}, 使用方法: {', '.join(used_methods)}"
+                        
+                        # 显示验证信息
+                        if result.get('validation_warnings'):
+                            status_text += f"\n          ⚠️  验证警告: {'; '.join(result['validation_warnings'])}"
+                    else:
+                        status_icon = "❌"
+                        error = result.get('error', '未知错误')
+                        status_text = f"识别失败 ({error})"
+                else:
+                    status_icon = "⚪"
+                    status_text = "未处理"
+                
+                print(f"   {position_name:>6}: {status_icon} {status_text}")
+            
+            # 显示总体统计
+            print("-" * 60)
+            summary = merged_result.get('summary', {})
+            print(f"📈 总体统计:")
+            print(f"   总位置数: {summary.get('total_positions', 0)}")
+            print(f"   成功位置数: {summary.get('successful_positions', 0)}")
+            print(f"   成功率: {summary.get('success_rate', 0):.1%}")
+            print(f"   处理耗时: {merged_result.get('processing_duration', 0):.3f}秒")
+            
+            # 显示识别方法统计
+            print(f"\n🔧 识别方法统计:")
+            method_stats = self.stats['recognition_method_stats']
+            for method, count in method_stats.items():
+                if count > 0:
+                    print(f"   {method}: {count} 次")
+            
+            # 显示质量分析
+            if 'quality' in merged_result:
+                quality = merged_result['quality']
+                print(f"\n🏆 质量分析:")
+                print(f"   质量等级: {quality.get('quality_level', 'N/A')}")
+                print(f"   质量评分: {quality.get('quality_score', 0):.3f}")
+                
+                confidence_stats = quality.get('confidence_stats', {})
+                if confidence_stats:
+                    print(f"   置信度统计: 平均{confidence_stats.get('average', 0):.3f}, "
+                          f"最低{confidence_stats.get('minimum', 0):.3f}, "
+                          f"最高{confidence_stats.get('maximum', 0):.3f}")
+                
+                if quality.get('suggestions'):
+                    print(f"   改进建议:")
+                    for suggestion in quality['suggestions']:
+                        print(f"     • {suggestion}")
+            
+        except Exception as e:
+            print(f"❌ 显示详细结果异常: {e}")
     
     def _extract_position_from_filename(self, filename: str) -> str:
         """从文件名提取位置信息"""
@@ -356,64 +506,24 @@ class PokerRecognitionTester:
         except:
             return "unknown"
     
-    def step5_display_results(self, results: Dict[str, Any]):
-        """步骤5: 展示结果"""
+    def _find_corresponding_left_image(self, main_image_path: str, left_files: List[str]) -> Optional[str]:
+        """查找对应的左上角图片"""
         try:
-            print("\n📊 步骤5: 展示识别结果")
-            print("=" * 60)
+            main_file = Path(main_image_path)
+            expected_left_name = f"{main_file.stem}_left.png"
             
-            if not results['success']:
-                print(f"❌ 识别过程失败: {results.get('error', '未知错误')}")
-                return
+            for left_file in left_files:
+                if Path(left_file).name == expected_left_name:
+                    return left_file
             
-            recognition_results = results['results']
-            
-            # 位置名称映射
-            position_names = {
-                'zhuang_1': '庄家1', 'zhuang_2': '庄家2', 'zhuang_3': '庄家3',
-                'xian_1': '闲家1', 'xian_2': '闲家2', 'xian_3': '闲家3'
-            }
-            
-            print("详细识别结果 (仅YOLO):")
-            print("-" * 60)
-            
-            # 按位置顺序显示
-            positions = ['zhuang_1', 'zhuang_2', 'zhuang_3', 'xian_1', 'xian_2', 'xian_3']
-            
-            for position in positions:
-                position_name = position_names.get(position, position)
-                
-                if position in recognition_results:
-                    result = recognition_results[position]
-                    
-                    if result['success']:
-                        display_name = result.get('display_name', 'N/A')
-                        confidence = result.get('confidence', 0)
-                        
-                        status_icon = "✅"
-                        status_text = f"{display_name} (置信度: {confidence:.3f})"
-                    else:
-                        status_icon = "❌"
-                        error = result.get('error', '未知错误')
-                        status_text = f"识别失败 ({error})"
-                else:
-                    status_icon = "⚪"
-                    status_text = "未处理"
-                
-                print(f"   {position_name:>6}: {status_icon} {status_text}")
-            
-            print("-" * 60)
-            print(f"总计: {results['successful_count']}/{results['total_count']} 成功 "
-                  f"(成功率: {results['success_rate']:.1f}%)")
-            print("ℹ️  注意: 当前版本仅使用YOLO识别，未使用OCR功能")
-            
-        except Exception as e:
-            print(f"❌ 显示结果异常: {e}")
+            return None
+        except:
+            return None
     
     def run_complete_test(self) -> bool:
         """运行完整测试流程"""
         try:
-            print(f"\n🎯 开始完整识别测试流程 (仅YOLO)")
+            print(f"\n🎯 开始完整识别测试流程 (增强版)")
             print(f"摄像头: {self.selected_camera_id}")
             print("=" * 60)
             
@@ -432,14 +542,23 @@ class PokerRecognitionTester:
                 self.stats['failed_tests'] += 1
                 return False
             
-            # 步骤4: 识别
-            recognition_result = self.step4_recognize_images(crop_result['cropped_files'])
+            # 步骤4: 混合识别
+            recognition_result = self.step4_hybrid_recognition(
+                crop_result['main_files'], 
+                crop_result['left_files']
+            )
             if not recognition_result['success']:
                 self.stats['failed_tests'] += 1
                 return False
             
-            # 步骤5: 展示结果
-            self.step5_display_results(recognition_result)
+            # 步骤5: 合并结果
+            merge_result = self.step5_merge_results(recognition_result['position_results'])
+            if not merge_result['success']:
+                self.stats['failed_tests'] += 1
+                return False
+            
+            # 步骤6: 展示详细结果
+            self.step6_display_detailed_results(merge_result['merged_result'])
             
             duration = time.time() - start_time
             print(f"\n⏱️  总耗时: {duration:.2f} 秒")
@@ -469,7 +588,17 @@ class PokerRecognitionTester:
                 print(f"成功率: {success_rate:.1f}%")
             
             print(f"总运行时间: {total_time:.1f} 秒")
-            print(f"识别模式: 仅YOLO (已禁用OCR)")
+            
+            # 显示识别方法统计
+            method_stats = self.stats['recognition_method_stats']
+            total_recognitions = sum(method_stats.values())
+            if total_recognitions > 0:
+                print(f"\n识别方法统计 (总计: {total_recognitions} 次):")
+                for method, count in method_stats.items():
+                    if count > 0:
+                        percentage = (count / total_recognitions) * 100
+                        print(f"  {method}: {count} 次 ({percentage:.1f}%)")
+            
             print("=" * 40)
             
         except Exception as e:
@@ -478,7 +607,7 @@ class PokerRecognitionTester:
 def parse_arguments():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(
-        description='扑克识别系统完整测试程序 (仅YOLO版本)',
+        description='扑克识别系统完整测试程序 (增强版)',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:
@@ -487,7 +616,11 @@ def parse_arguments():
   python see.py --count 5          # 连续测试5次
   python see.py --camera 002       # 指定摄像头ID
 
-注意: 当前版本仅使用YOLO识别，不支持OCR功能
+增强功能:
+  - 使用统一配置加载器
+  - 支持混合识别 (YOLO + OCR + OpenCV)
+  - 结果合并和质量分析
+  - 详细的统计信息
         """
     )
     
@@ -508,19 +641,20 @@ def main():
         args = parse_arguments()
         
         # 创建测试器
-        tester = PokerRecognitionTester()
+        tester = EnhancedPokerRecognitionTester()
         
         # 初始化系统
         if not tester.initialize():
             return 1
         
         # 步骤1: 读取摄像头配置
-        if not tester.step1_read_cameras():
+        if not tester.step1_load_camera_config():
             return 1
         
         # 如果指定了摄像头ID，使用指定的摄像头
         if args.camera_id:
-            camera_result = tester.get_camera_by_id(args.camera_id)
+            from src.core.config_loader import get_camera_by_id
+            camera_result = get_camera_by_id(args.camera_id)
             if camera_result['status'] == 'success':
                 tester.selected_camera_id = args.camera_id
                 print(f"✅ 使用指定摄像头: {args.camera_id}")
@@ -573,7 +707,7 @@ def main():
         if tester.stats['total_tests'] > 0:
             tester.display_statistics()
         
-        print("👋 扑克识别测试系统已关闭")
+        print("👋 增强版扑克识别测试系统已关闭")
         
         return 0
         
