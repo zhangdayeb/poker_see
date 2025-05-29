@@ -42,7 +42,7 @@
           "marked": true,
           "label": "庄1",
           "description": "庄1位置",
-          "updated_at": "2025-05-28T13:10:51.724116",
+          "updated_at": "2025-05-29T07:34:41.887544",
           "validation_passed": true
         },
         "zhuang_2": {
@@ -53,7 +53,7 @@
           "marked": true,
           "label": "庄2",
           "description": "庄2位置",
-          "updated_at": "2025-05-28T13:10:51.724127",
+          "updated_at": "2025-05-29T07:34:41.887555",
           "validation_passed": true
         },
         "zhuang_3": {
@@ -64,7 +64,7 @@
           "marked": true,
           "label": "庄3",
           "description": "庄3位置",
-          "updated_at": "2025-05-28T13:10:51.724133",
+          "updated_at": "2025-05-29T07:34:41.887561",
           "validation_passed": true
         },
         "xian_1": {
@@ -75,7 +75,7 @@
           "marked": true,
           "label": "闲1",
           "description": "闲1位置",
-          "updated_at": "2025-05-28T13:10:51.724137",
+          "updated_at": "2025-05-29T07:34:41.887565",
           "validation_passed": true
         },
         "xian_2": {
@@ -86,7 +86,7 @@
           "marked": true,
           "label": "闲2",
           "description": "闲2位置",
-          "updated_at": "2025-05-28T13:10:51.724141",
+          "updated_at": "2025-05-29T07:34:41.887569",
           "validation_passed": true
         },
         "xian_3": {
@@ -97,7 +97,7 @@
           "marked": true,
           "label": "闲3",
           "description": "闲3位置",
-          "updated_at": "2025-05-28T13:10:51.724145",
+          "updated_at": "2025-05-29T07:34:41.887572",
           "validation_passed": true
         }
       }
