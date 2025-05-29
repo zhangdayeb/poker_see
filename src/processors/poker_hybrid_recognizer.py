@@ -7,6 +7,7 @@
 2. 摄像头全位置批量识别
 3. 结果融合和综合判断
 4. 命令行测试支持
+5. 函数接口供其他模块调用
 """
 
 import os
@@ -439,6 +440,74 @@ class HybridPokerRecognizer:
             }
         }
 
+# ============ 新增：供其他模块调用的函数接口 ============
+
+# 创建全局识别器实例
+_global_recognizer = None
+
+def get_recognizer():
+    """获取全局识别器实例"""
+    global _global_recognizer
+    if _global_recognizer is None:
+        _global_recognizer = HybridPokerRecognizer()
+    return _global_recognizer
+
+def recognize_single_card_func(main_image_path: str, left_image_path: str = None) -> Dict[str, Any]:
+    """
+    供其他模块调用的单张扑克牌识别函数
+    
+    Args:
+        main_image_path: 主图片路径
+        left_image_path: 左上角图片路径（可选）
+        
+    Returns:
+        dict: 识别结果
+    """
+    recognizer = get_recognizer()
+    return recognizer.recognize_single_card(main_image_path, left_image_path)
+
+def recognize_camera_positions_func(camera_id: str, cut_image_dir: str = None) -> Dict[str, Any]:
+    """
+    供其他模块调用的摄像头批量识别函数
+    
+    Args:
+        camera_id: 摄像头ID
+        cut_image_dir: 裁剪图片目录，默认为 src/image/cut/
+        
+    Returns:
+        dict: 所有位置的识别结果
+    """
+    if cut_image_dir is None:
+        project_root = setup_project_paths()
+        cut_image_dir = str(project_root / "src" / "image" / "cut")
+    
+    recognizer = get_recognizer()
+    return recognizer.recognize_camera_positions(camera_id, cut_image_dir)
+
+def recognize_single_card_silent(main_image_path: str, left_image_path: str = None) -> Dict[str, Any]:
+    """
+    静默单张识别函数，不输出调试信息
+    
+    Args:
+        main_image_path: 主图片路径
+        left_image_path: 左上角图片路径（可选）
+        
+    Returns:
+        dict: 识别结果
+    """
+    # 临时禁用print输出
+    import builtins
+    original_print = builtins.print
+    builtins.print = lambda *args, **kwargs: None
+    
+    try:
+        result = recognize_single_card_func(main_image_path, left_image_path)
+        return result
+    finally:
+        # 恢复print输出
+        builtins.print = original_print
+
+# ============ 命令行接口保持不变 ============
 
 def test_single_card(main_path: str, left_path: str = None):
     """测试单张扑克牌识别"""
@@ -466,7 +535,6 @@ def test_single_card(main_path: str, left_path: str = None):
                     print(f"   {method}: {display} (置信度: {detail['confidence']:.3f})")
     else:
         print(f"\n❌ 识别失败: {result['error']}")
-
 
 def test_camera_batch(camera_id: str, cut_dir: str):
     """测试摄像头批量识别"""
@@ -497,7 +565,6 @@ def test_camera_batch(camera_id: str, cut_dir: str):
     else:
         print(f"\n❌ 批量识别失败: {result['error']}")
 
-
 def show_capabilities():
     """显示识别能力"""
     print("🔍 混合识别器能力检查")
@@ -516,7 +583,6 @@ def show_capabilities():
         print("⚠️  部分识别方法不可用，可能影响识别准确性")
     else:
         print("✅ 所有识别方法都可用")
-
 
 def parse_arguments():
     """解析命令行参数"""
@@ -544,7 +610,6 @@ def parse_arguments():
     
     return parser.parse_args()
 
-
 def main():
     """主函数"""
     args = parse_arguments()
@@ -561,7 +626,6 @@ def main():
         # 默认显示帮助
         print("请使用 --help 查看使用方法")
         show_capabilities()
-
 
 if __name__ == "__main__":
     main()

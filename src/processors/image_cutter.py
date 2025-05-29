@@ -3,12 +3,7 @@
 """
 智能图片裁剪器 - 基于标记位置自动裁剪扑克牌区域（支持横图智能旋转）
 用法: python image_cutter.py <图片路径>
-示例: python image_cutter.py src/image/camera_001.png
-
-功能:
-1. 根据配置文件中的标记位置裁剪6个区域
-2. 每个区域再裁剪左上角1/4部分
-3. 智能识别横图并旋转为竖图（针对zhuang_3和xian_3）
+或者: from image_cutter import process_image_func
 """
 
 import sys
@@ -355,6 +350,116 @@ def process_image(image_path):
     except Exception as e:
         print(f"❌ 处理异常: {e}")
         return False
+
+# ============ 新增：供其他模块调用的函数接口 ============
+
+def process_image_func(image_path: str) -> bool:
+    """
+    供其他模块调用的图片处理函数
+    
+    Args:
+        image_path: 图片路径
+        
+    Returns:
+        bool: 处理是否成功
+    """
+    return process_image(image_path)
+
+def process_image_silent(image_path: str) -> dict:
+    """
+    静默图片处理函数，返回详细结果信息
+    
+    Args:
+        image_path: 图片路径
+        
+    Returns:
+        dict: 处理结果 {"success": bool, "message": str, "processed_count": int, "output_dir": str}
+    """
+    try:
+        # 检查图片是否存在
+        image_path = Path(image_path)
+        if not image_path.exists():
+            return {
+                "success": False,
+                "message": f"图片文件不存在: {image_path}",
+                "processed_count": 0,
+                "output_dir": ""
+            }
+        
+        # 提取摄像头ID
+        camera_id = extract_camera_id_from_filename(image_path.name)
+        if not camera_id:
+            return {
+                "success": False,
+                "message": f"无法从文件名提取摄像头ID: {image_path.name}",
+                "processed_count": 0,
+                "output_dir": ""
+            }
+        
+        # 加载摄像头配置
+        camera_config = load_camera_config(camera_id)
+        if not camera_config:
+            return {
+                "success": False,
+                "message": "摄像头配置不存在",
+                "processed_count": 0,
+                "output_dir": ""
+            }
+        
+        # 获取有效标记
+        valid_marks = get_valid_marks(camera_config)
+        if not valid_marks:
+            return {
+                "success": False,
+                "message": f"摄像头 {camera_id} 没有有效标记",
+                "processed_count": 0,
+                "output_dir": ""
+            }
+        
+        # 处理图片
+        with Image.open(image_path) as image:
+            output_dir = image_path.parent / "cut"
+            output_dir.mkdir(exist_ok=True)
+            
+            success_count = 0
+            
+            # 处理每个标记位置
+            for position_name, position_data in valid_marks.items():
+                # 裁剪标记区域
+                cropped = crop_region(image, position_name, position_data)
+                if cropped is None:
+                    continue
+                
+                # 保存完整裁剪图片
+                main_filename = f"camera_{camera_id}_{position_name}.png"
+                main_path = output_dir / main_filename
+                cropped.save(main_path, 'PNG')
+                
+                # 裁剪并保存左上角1/4
+                left_quarter = crop_left_quarter(cropped, position_name)
+                if left_quarter is not None:
+                    left_filename = f"camera_{camera_id}_{position_name}_left.png"
+                    left_path = output_dir / left_filename
+                    left_quarter.save(left_path, 'PNG')
+                
+                success_count += 1
+            
+            return {
+                "success": success_count > 0,
+                "message": f"处理完成: {success_count}/{len(valid_marks)} 个位置成功",
+                "processed_count": success_count,
+                "output_dir": str(output_dir)
+            }
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"处理异常: {str(e)}",
+            "processed_count": 0,
+            "output_dir": ""
+        }
+
+# ============ 命令行接口保持不变 ============
 
 def main():
     """主函数"""

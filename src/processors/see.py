@@ -17,12 +17,6 @@ from datetime import datetime
 # 固定位置列表
 POSITIONS = ['zhuang_1', 'zhuang_2', 'zhuang_3', 'xian_1', 'xian_2', 'xian_3']
 
-def get_project_root():
-    """获取项目根目录"""
-    current_file = Path(__file__).resolve()
-    # 从 src/processors/see.py 向上找到项目根目录
-    return current_file.parent.parent.parent
-
 def parse_args():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(description='极简扑克识别工具')
@@ -45,18 +39,15 @@ def print_error_and_exit(error_msg, details=None):
 
 def take_photo(camera_id):
     """执行拍照"""
-    project_root = get_project_root()
-    photo_script = project_root / "src" / "processors" / "photo_controller.py"
-    
-    cmd = [sys.executable, str(photo_script), "--camera", camera_id]
+    cmd = f"python src/processors/photo_controller.py --camera {camera_id}"
     
     try:
         result = subprocess.run(
             cmd,
+            shell=True,
             capture_output=True,
             text=True,
-            timeout=30,
-            cwd=str(project_root)
+            timeout=30
         )
         
         return result.returncode == 0
@@ -68,23 +59,20 @@ def take_photo(camera_id):
 
 def cut_image(camera_id):
     """执行切图"""
-    project_root = get_project_root()
-    cutter_script = project_root / "src" / "processors" / "image_cutter.py"
-    image_path = project_root / "src" / "image" / f"camera_{camera_id}.png"
-    
     # 检查拍照文件是否存在
-    if not image_path.exists():
+    image_path = f"src/image/camera_{camera_id}.png"
+    if not Path(image_path).exists():
         print_error_and_exit("拍照文件不存在")
     
-    cmd = [sys.executable, str(cutter_script), str(image_path)]
+    cmd = f"python src/processors/image_cutter.py {image_path}"
     
     try:
         result = subprocess.run(
             cmd,
+            shell=True,
             capture_output=True,
             text=True,
-            timeout=10,
-            cwd=str(project_root)
+            timeout=10
         )
         
         return result.returncode == 0
@@ -96,33 +84,29 @@ def cut_image(camera_id):
 
 def recognize_single_position(camera_id, position):
     """识别单个位置"""
-    project_root = get_project_root()
-    recognizer_script = project_root / "src" / "processors" / "poker_hybrid_recognizer.py"
-    
     # 构建图片路径
-    cut_dir = project_root / "src" / "image" / "cut"
-    main_image = cut_dir / f"camera_{camera_id}_{position}.png"
-    left_image = cut_dir / f"camera_{camera_id}_{position}_left.png"
+    main_image = f"src/image/cut/camera_{camera_id}_{position}.png"
+    left_image = f"src/image/cut/camera_{camera_id}_{position}_left.png"
     
     # 检查主图片是否存在
-    if not main_image.exists():
+    if not Path(main_image).exists():
         return {
             "success": False,
             "error": "图片不存在"
         }
     
     # 构建识别命令
-    cmd = [sys.executable, str(recognizer_script), "--main", str(main_image)]
-    if left_image.exists():
-        cmd.extend(["--left", str(left_image)])
+    cmd = f"python src/processors/poker_hybrid_recognizer.py --main {main_image}"
+    if Path(left_image).exists():
+        cmd += f" --left {left_image}"
     
     try:
         result = subprocess.run(
             cmd,
+            shell=True,
             capture_output=True,
             text=True,
-            timeout=15,
-            cwd=str(project_root)
+            timeout=15
         )
         
         if result.returncode == 0:
