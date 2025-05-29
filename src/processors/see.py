@@ -10,7 +10,6 @@ import sys
 import json
 import time
 import argparse
-import subprocess
 from pathlib import Path
 from datetime import datetime
 
@@ -37,116 +36,93 @@ def print_error_and_exit(error_msg, details=None):
     print(json.dumps(result, ensure_ascii=False))
     sys.exit(1)
 
-def take_photo(camera_id):
-    """执行拍照"""
-    cmd = f"python src/processors/photo_controller.py --camera {camera_id}"
+# 设置项目路径
+def setup_project_paths():
+    """设置项目路径"""
+    current_file = Path(__file__).resolve()
+    project_root = current_file
+    while project_root.parent != project_root:
+        if (project_root / "main.py").exists():
+            break
+        project_root = project_root.parent
     
+    project_root_str = str(project_root)
+    if project_root_str not in sys.path:
+        sys.path.insert(0, project_root_str)
+    
+    return project_root
+
+# 设置路径
+PROJECT_ROOT = setup_project_paths()
+
+def take_photo(camera_id):
+    """执行拍照 - 直接调用函数"""
     try:
-        result = subprocess.run(
-            cmd,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
+        from src.processors.photo_controller import take_photo_silent
         
-        return result.returncode == 0
+        result = take_photo_silent(camera_id)
+        return result["success"]
         
-    except subprocess.TimeoutExpired:
-        print_error_and_exit("拍照超时")
+    except ImportError as e:
+        print_error_and_exit("拍照模块导入失败", str(e))
     except Exception as e:
         print_error_and_exit("拍照异常", str(e))
 
 def cut_image(camera_id):
-    """执行切图"""
-    # 检查拍照文件是否存在
-    image_path = f"src/image/camera_{camera_id}.png"
-    if not Path(image_path).exists():
-        print_error_and_exit("拍照文件不存在")
-    
-    cmd = f"python src/processors/image_cutter.py {image_path}"
-    
+    """执行切图 - 直接调用函数"""
     try:
-        result = subprocess.run(
-            cmd,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
+        from src.processors.image_cutter import process_image_silent
         
-        return result.returncode == 0
+        # 构建图片路径
+        image_path = PROJECT_ROOT / "src" / "image" / f"camera_{camera_id}.png"
         
-    except subprocess.TimeoutExpired:
-        print_error_and_exit("切图超时")
+        if not image_path.exists():
+            print_error_and_exit("拍照文件不存在")
+        
+        result = process_image_silent(str(image_path))
+        return result["success"]
+        
+    except ImportError as e:
+        print_error_and_exit("切图模块导入失败", str(e))
     except Exception as e:
         print_error_and_exit("切图异常", str(e))
 
 def recognize_single_position(camera_id, position):
-    """识别单个位置"""
-    # 构建图片路径
-    main_image = f"src/image/cut/camera_{camera_id}_{position}.png"
-    left_image = f"src/image/cut/camera_{camera_id}_{position}_left.png"
-    
-    # 检查主图片是否存在
-    if not Path(main_image).exists():
-        return {
-            "success": False,
-            "error": "图片不存在"
-        }
-    
-    # 构建识别命令
-    cmd = f"python src/processors/poker_hybrid_recognizer.py --main {main_image}"
-    if Path(left_image).exists():
-        cmd += f" --left {left_image}"
-    
+    """识别单个位置 - 直接调用函数"""
     try:
-        result = subprocess.run(
-            cmd,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=15
-        )
+        from src.processors.poker_hybrid_recognizer import recognize_single_card_silent
         
-        if result.returncode == 0:
-            # 解析识别输出，提取关键信息
-            output_lines = result.stdout.strip().split('\n')
-            
-            # 查找最终结果行
-            for line in reversed(output_lines):
-                if '最终结果:' in line:
-                    # 解析结果行，提取卡牌和置信度
-                    try:
-                        if '置信度:' in line:
-                            parts = line.split('最终结果:')[1].strip()
-                            card_part = parts.split('(置信度:')[0].strip()
-                            confidence_part = parts.split('置信度:')[1].split(',')[0].strip().rstrip(')')
-                            
-                            return {
-                                "success": True,
-                                "card": card_part,
-                                "confidence": float(confidence_part)
-                            }
-                    except:
-                        pass
-            
-            # 如果没有找到标准格式，返回基本成功
+        # 构建图片路径
+        main_image = PROJECT_ROOT / "src" / "image" / "cut" / f"camera_{camera_id}_{position}.png"
+        left_image = PROJECT_ROOT / "src" / "image" / "cut" / f"camera_{camera_id}_{position}_left.png"
+        
+        # 检查主图片是否存在
+        if not main_image.exists():
+            return {
+                "success": False,
+                "error": "图片不存在"
+            }
+        
+        # 调用识别函数
+        left_path = str(left_image) if left_image.exists() else None
+        result = recognize_single_card_silent(str(main_image), left_path)
+        
+        if result["success"]:
             return {
                 "success": True,
-                "card": "未知",
-                "confidence": 0.0
+                "card": result.get("display_name", "未知"),
+                "confidence": result.get("confidence", 0.0)
             }
         else:
             return {
                 "success": False,
-                "error": "识别失败"
+                "error": result.get("error", "识别失败")
             }
             
-    except subprocess.TimeoutExpired:
+    except ImportError as e:
         return {
             "success": False,
-            "error": "识别超时"
+            "error": f"识别模块导入失败: {str(e)}"
         }
     except Exception as e:
         return {
