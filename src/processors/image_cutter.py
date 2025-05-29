@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-简化图片裁剪器 - 基于标记位置自动裁剪扑克牌区域
+智能图片裁剪器 - 基于标记位置自动裁剪扑克牌区域（支持横图智能旋转）
 用法: python image_cutter.py <图片路径>
 示例: python image_cutter.py src/image/camera_001.png
 
 功能:
 1. 根据配置文件中的标记位置裁剪6个区域
 2. 每个区域再裁剪左上角1/4部分
+3. 智能识别横图并旋转为竖图（针对zhuang_3和xian_3）
 """
 
 import sys
 import os
 import json
+import cv2
+import numpy as np
 from pathlib import Path
 from PIL import Image
 
@@ -115,9 +118,55 @@ def get_valid_marks(camera_config):
     
     return valid_marks
 
+def should_rotate_image(position_name: str, width: int, height: int) -> bool:
+    """
+    判断是否需要旋转图片
+    
+    Args:
+        position_name: 位置名称
+        width: 图片宽度
+        height: 图片高度
+        
+    Returns:
+        bool: 是否需要旋转
+    """
+    # 只对特定位置的横图进行旋转
+    horizontal_positions = ['zhuang_3', 'xian_3']
+    is_horizontal = width > height * 1.2  # 宽度比高度大20%以上认为是横图
+    
+    return position_name in horizontal_positions and is_horizontal
+
+def rotate_image_to_vertical(pil_image, position_name: str):
+    """
+    将横图旋转为竖图
+    
+    Args:
+        pil_image: PIL图像对象
+        position_name: 位置名称
+        
+    Returns:
+        PIL.Image: 旋转后的图像
+    """
+    try:
+        width, height = pil_image.size
+        
+        if should_rotate_image(position_name, width, height):
+            # 逆时针旋转90度，使横图变竖图
+            rotated_image = pil_image.rotate(90, expand=True)
+            new_width, new_height = rotated_image.size
+            
+            print(f"  ↻ 横图旋转: {width}×{height} -> {new_width}×{new_height}")
+            return rotated_image
+        
+        return pil_image
+        
+    except Exception as e:
+        print(f"❌ 图片旋转失败: {e}")
+        return pil_image
+
 def crop_region(image, position_name, position_data):
     """
-    裁剪指定区域
+    裁剪指定区域（支持智能旋转）
     
     Args:
         image: PIL Image对象
@@ -164,18 +213,25 @@ def crop_region(image, position_name, position_data):
         # 执行裁剪
         cropped = image.crop((left, top, right, bottom))
         
+        # 新增：智能旋转处理
+        cropped_width, cropped_height = cropped.size
+        if should_rotate_image(position_name, cropped_width, cropped_height):
+            print(f"  🔄 检测到横图 {position_name}，准备旋转...")
+            cropped = rotate_image_to_vertical(cropped, position_name)
+        
         return cropped
         
     except Exception as e:
         print(f"❌ {position_name}: 裁剪失败 - {e}")
         return None
 
-def crop_left_quarter(image):
+def crop_left_quarter(image, position_name: str = ""):
     """
     裁剪图片左上角的1/4部分
     
     Args:
         image: PIL Image对象
+        position_name: 位置名称（用于日志）
         
     Returns:
         PIL.Image: 左上角1/4的图片
@@ -190,17 +246,17 @@ def crop_left_quarter(image):
         # 裁剪左上角区域 (0, 0) -> (width/2, height/2)
         left_quarter = image.crop((0, 0, quarter_width, quarter_height))
         
-        print(f"  ↳ 左上角1/4: {quarter_width}×{quarter_height}")
+        print(f"  ↳ {position_name} 左上角1/4: {quarter_width}×{quarter_height}")
         
         return left_quarter
         
     except Exception as e:
-        print(f"❌ 左上角裁剪失败: {e}")
+        print(f"❌ {position_name} 左上角裁剪失败: {e}")
         return None
 
 def process_image(image_path):
     """
-    处理单张图片
+    处理单张图片（支持智能旋转）
     
     Args:
         image_path: 图片路径
@@ -251,15 +307,22 @@ def process_image(image_path):
                 
                 success_count = 0
                 total_count = len(valid_marks)
+                rotation_count = 0  # 统计旋转次数
                 
                 # 处理每个标记位置
                 for position_name, position_data in valid_marks.items():
                     print(f"\n🔄 处理位置: {position_name}")
                     
-                    # 第一步：裁剪标记区域
+                    # 第一步：裁剪标记区域（支持智能旋转）
                     cropped = crop_region(image, position_name, position_data)
                     if cropped is None:
                         continue
+                    
+                    # 检查是否进行了旋转
+                    original_width = int(position_data['width'])
+                    original_height = int(position_data['height'])
+                    if should_rotate_image(position_name, original_width, original_height):
+                        rotation_count += 1
                     
                     # 保存完整裁剪图片
                     main_filename = f"camera_{camera_id}_{position_name}.png"
@@ -268,7 +331,7 @@ def process_image(image_path):
                     print(f"💾 保存: {main_filename} ({cropped.size[0]}×{cropped.size[1]})")
                     
                     # 第二步：裁剪左上角1/4
-                    left_quarter = crop_left_quarter(cropped)
+                    left_quarter = crop_left_quarter(cropped, position_name)
                     if left_quarter is not None:
                         # 保存左上角1/4图片
                         left_filename = f"camera_{camera_id}_{position_name}_left.png"
@@ -279,6 +342,8 @@ def process_image(image_path):
                     success_count += 1
                 
                 print(f"\n📊 处理完成: {success_count}/{total_count} 个位置成功")
+                if rotation_count > 0:
+                    print(f"🔄 智能旋转: {rotation_count} 个横图已旋转为竖图")
                 print(f"📁 输出目录: {output_dir}")
                 
                 return success_count > 0
@@ -293,7 +358,7 @@ def process_image(image_path):
 
 def main():
     """主函数"""
-    print("🎯 图片裁剪器 v2.0")
+    print("🎯 智能图片裁剪器 v2.1 (支持横图智能旋转)")
     print("=" * 50)
     
     # 检查命令行参数
@@ -301,6 +366,10 @@ def main():
         print("用法: python image_cutter.py <图片路径>")
         print("示例: python image_cutter.py src/image/camera_001.png")
         print("     python image_cutter.py /path/to/camera_002.png")
+        print("\n新功能:")
+        print("✨ 自动识别 zhuang_3 和 xian_3 位置的横图")
+        print("🔄 智能旋转横图为竖图，优化OCR识别效果")
+        print("📏 旋转判断条件: 宽度 > 高度 × 1.2")
         sys.exit(1)
     
     # 获取图片路径
@@ -315,7 +384,8 @@ def main():
     success = process_image(image_path)
     
     if success:
-        print("\n✅ 图片裁剪完成!")
+        print("\n✅ 智能图片裁剪完成!")
+        print("💡 横图已智能旋转为竖图，提高OCR识别准确率")
     else:
         print("\n❌ 图片裁剪失败!")
         sys.exit(1)
