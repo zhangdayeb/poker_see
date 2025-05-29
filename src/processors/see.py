@@ -186,6 +186,64 @@ def recognize_all_positions(camera_id):
         }
     }
 
+def recognize_camera(camera_id):
+    """
+    供其他模块调用的摄像头识别函数
+    
+    Args:
+        camera_id: 摄像头ID (如: "001")
+        
+    Returns:
+        dict: 识别结果字典
+    """
+    start_time = time.time()
+    
+    try:
+        # 步骤1: 拍照
+        if not take_photo(camera_id):
+            return {
+                "success": False,
+                "error": "拍照失败",
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        # 步骤2: 切图
+        if not cut_image(camera_id):
+            return {
+                "success": False,
+                "error": "切图失败", 
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        # 步骤3: 识别所有位置
+        results = recognize_all_positions(camera_id)
+        
+        # 添加处理时间
+        processing_time = time.time() - start_time
+        results["processing_time"] = round(processing_time, 1)
+        
+        return results
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"处理异常: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }
+
+def recognize_camera_json(camera_id):
+    """
+    供其他模块调用的JSON字符串版本
+    
+    Args:
+        camera_id: 摄像头ID (如: "001")
+        
+    Returns:
+        str: JSON格式的识别结果
+    """
+    result = recognize_camera(camera_id)
+    return json.dumps(result, ensure_ascii=False)
+
 def main():
     """主函数"""
     start_time = time.time()
